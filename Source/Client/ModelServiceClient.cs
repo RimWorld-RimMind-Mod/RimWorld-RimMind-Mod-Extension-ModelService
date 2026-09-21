@@ -20,7 +20,10 @@ namespace RimMind.ModelService.Client
 {
     public class ModelServiceClient : IAIClient
     {
-        private static readonly HttpClient HttpClient = new HttpClient
+        private static readonly HttpClient HttpClient = new HttpClient(new HttpClientHandler
+        {
+            AllowAutoRedirect = false
+        })
         {
             Timeout = TimeSpan.FromSeconds(60)
         };
@@ -41,14 +44,14 @@ namespace RimMind.ModelService.Client
         }
 
         public bool IsLocalEndpoint => false;
-        public bool IsConfigured() => _endpointsProvider().Count > 0;
+        public bool IsConfigured() => _endpointsProvider().Any(e => e.isEnabled);
         public bool SupportsStreaming => false;
         public bool SupportsNpcServerState => false;
 
         public async Task<Result<LlmResponse, RimMindError>> SendAsync(LlmRequestEnvelope envelope)
         {
-            var endpoints = _endpointsProvider();
-            if (endpoints == null || endpoints.Count == 0)
+            var endpoints = _endpointsProvider()?.ToArray();
+            if (endpoints == null || endpoints.Length == 0)
             {
                 return Result<LlmResponse, RimMindError>.Err(
                     RimMindErrors.ClientNotConfigured("No model service endpoints configured."));
@@ -59,13 +62,18 @@ namespace RimMind.ModelService.Client
 
             var triedEndpoints = new HashSet<string>();
             var eligible = _loadBalancer.GetEligibleEndpoints(endpoints, currentTick);
-            int maxAttempts = Math.Max(1, eligible.Count);
+            // If all endpoints are temporarily isolated by circuit breaker, fall back to enabled endpoints
+            // so LoadBalancer.SelectEndpoint can execute its self-healing probe branch!
+            var candidatePool = eligible.Count > 0
+                ? eligible
+                : endpoints.Where(e => e.isEnabled).ToList();
 
+            int maxAttempts = Math.Max(1, candidatePool.Count);
             string lastErrorMessage = "";
 
             for (int attempt = 0; attempt < maxAttempts; attempt++)
             {
-                var candidates = eligible.Where(e => !triedEndpoints.Contains(e.id)).ToList();
+                var candidates = candidatePool.Where(e => !triedEndpoints.Contains(e.id)).ToList();
                 var node = _loadBalancer.SelectEndpoint(candidates, strategy, currentTick);
                 if (node == null) break;
 
@@ -73,11 +81,11 @@ namespace RimMind.ModelService.Client
 
                 if (node.providerType == ProviderType.LocalSubscriptionGateway)
                 {
-                    if (!LocalLoopbackValidator.IsLoopbackAddress(node.endpoint))
+                    if (!node.IsLoopbackAddress)
                     {
                         node.RecordFailure(currentTick);
-                        lastErrorMessage = "Security violation: Local subscription gateway must be on loopback (127.0.0.1)";
-                        continue;
+                        return Result<LlmResponse, RimMindError>.Err(
+                            RimMindErrors.ClientPermanent("Security violation: Local subscription gateway must be on loopback (127.0.0.1)"));
                     }
                 }
 
@@ -104,7 +112,7 @@ namespace RimMind.ModelService.Client
             {
                 string requestUrl;
                 string payloadJson;
-                var request = new HttpRequestMessage(HttpMethod.Post, "");
+                using var request = new HttpRequestMessage(HttpMethod.Post, "");
 
                 if (node.providerType == ProviderType.AnthropicClaude)
                 {
@@ -127,9 +135,10 @@ namespace RimMind.ModelService.Client
                     }
                 }
 
-                request.Content = new StringContent(payloadJson, Encoding.UTF8, "application/json");
+                using var content = new StringContent(payloadJson, Encoding.UTF8, "application/json");
+                request.Content = content;
 
-                using var response = await HttpClient.SendAsync(request).ConfigureAwait(false);
+                using var response = await HttpClient.SendAsync(request, envelope.Ct).ConfigureAwait(false);
                 string responseBody = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
                 stopwatch.Stop();
 
@@ -152,9 +161,19 @@ namespace RimMind.ModelService.Client
                 if (parseResult.IsOk)
                 {
                     node.RecordSuccess((int)stopwatch.ElapsedMilliseconds);
+                    var val = parseResult.Value;
+                    string reqId = string.IsNullOrEmpty(val.RequestId) ? envelope.RequestId : val.RequestId;
+                    val = val.With(requestId: reqId, state: AIRequestState.Completed);
+                    parseResult = Result<LlmResponse, RimMindError>.Ok(val);
                 }
 
                 return parseResult;
+            }
+            catch (OperationCanceledException)
+            {
+                stopwatch.Stop();
+                return Result<LlmResponse, RimMindError>.Err(
+                    RimMindErrors.ClientTransient("Request was canceled."));
             }
             catch (Exception ex)
             {

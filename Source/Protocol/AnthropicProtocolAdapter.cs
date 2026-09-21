@@ -37,6 +37,7 @@ namespace RimMind.ModelService.Protocol
             var messagesArray = new JArray();
             if (envelope.Messages != null && envelope.Messages.Count > 0)
             {
+                JObject? lastUserMsg = null;
                 foreach (var msg in envelope.Messages)
                 {
                     if (msg.Role == "system") continue; // Extracted to top-level
@@ -87,21 +88,35 @@ namespace RimMind.ModelService.Protocol
                         }
                     }
 
-                    // Anthropic requires at least one content block per message
-                    if (contentArr.Count == 0)
+                    // Claude requires alternating user/assistant roles.
+                    // Merge consecutive user messages (e.g. multiple tool results) into the previous user message.
+                    if (role == "user" && lastUserMsg != null)
                     {
-                        contentArr.Add(new JObject
+                        var existingContent = (JArray)lastUserMsg["content"]!;
+                        foreach (var block in contentArr)
                         {
-                            ["type"] = "text",
-                            ["text"] = " "
-                        });
+                            existingContent.Add(block);
+                        }
                     }
-
-                    messagesArray.Add(new JObject
+                    else
                     {
-                        ["role"] = role,
-                        ["content"] = contentArr
-                    });
+                        if (contentArr.Count == 0)
+                        {
+                            contentArr.Add(new JObject
+                            {
+                                ["type"] = "text",
+                                ["text"] = " "
+                            });
+                        }
+
+                        var msgObj = new JObject
+                        {
+                            ["role"] = role,
+                            ["content"] = contentArr
+                        };
+                        messagesArray.Add(msgObj);
+                        lastUserMsg = role == "user" ? msgObj : null;
+                    }
                 }
             }
 
@@ -165,7 +180,7 @@ namespace RimMind.ModelService.Protocol
 
                 if (contentArray != null)
                 {
-                    var nativeList = new List<StructuredToolCall>();
+                    var wireList = new List<object>();
                     foreach (var block in contentArray)
                     {
                         string? type = block["type"]?.ToString();
@@ -184,17 +199,21 @@ namespace RimMind.ModelService.Protocol
                             var input = block["input"];
                             string argsJson = input != null ? input.ToString(Formatting.None) : "{}";
 
-                            nativeList.Add(new StructuredToolCall
+                            wireList.Add(new
                             {
-                                Id = id,
-                                Name = name,
-                                Arguments = argsJson
+                                id = id,
+                                type = "function",
+                                function = new
+                                {
+                                    name = name,
+                                    arguments = argsJson
+                                }
                             });
                         }
                     }
-                    if (nativeList.Count > 0)
+                    if (wireList.Count > 0)
                     {
-                        toolCallsJson = JsonConvert.SerializeObject(nativeList);
+                        toolCallsJson = JsonConvert.SerializeObject(wireList);
                     }
                 }
 

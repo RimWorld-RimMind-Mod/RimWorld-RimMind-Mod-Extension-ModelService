@@ -303,7 +303,7 @@ namespace RimMind.ModelService.Settings
                 // Security Banner (if LocalSubscriptionGateway: 🛡️ 本地回环安全锁定 if loopback, or ⚠️ 凭据安全拦截 if not loopback)
                 if (endpoint.providerType == ProviderType.LocalSubscriptionGateway)
                 {
-                    bool isLoopback = LocalLoopbackValidator.IsLoopbackAddress(endpoint.endpoint);
+                    bool isLoopback = endpoint.IsLoopbackAddress;
                     string bannerText = isLoopback
                         ? "RimMind.ModelService.Security.LoopbackLocked".Translate()
                         : "RimMind.ModelService.Security.LoopbackBlocked".Translate();

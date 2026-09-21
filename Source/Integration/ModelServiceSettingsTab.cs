@@ -8,7 +8,7 @@ namespace RimMind.ModelService.Integration
     public sealed class ModelServiceSettingsTab : ISettingsTab
     {
         public string Id => "model_service";
-        public string OwnerModId => "RimMindModelService";
+        public string OwnerModId => "mcocdaa.RimMindModelService";
         public string Label => "RimMind.ModelService.Settings.Category".Translate();
 
         public void Draw(Rect rect)

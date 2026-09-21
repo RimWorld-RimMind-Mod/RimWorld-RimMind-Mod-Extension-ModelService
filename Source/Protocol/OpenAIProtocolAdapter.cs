@@ -135,20 +135,24 @@ namespace RimMind.ModelService.Protocol
                 var toolCalls = message["tool_calls"] as JArray;
                 if (toolCalls != null && toolCalls.Count > 0)
                 {
-                    var nativeList = new List<StructuredToolCall>();
+                    var wireList = new List<object>();
                     foreach (var tc in toolCalls)
                     {
                         string id = tc["id"]?.ToString() ?? Guid.NewGuid().ToString("N");
                         string name = tc["function"]?["name"]?.ToString() ?? "";
                         string arguments = tc["function"]?["arguments"]?.ToString() ?? "{}";
-                        nativeList.Add(new StructuredToolCall
+                        wireList.Add(new
                         {
-                            Id = id,
-                            Name = name,
-                            Arguments = arguments
+                            id = id,
+                            type = "function",
+                            function = new
+                            {
+                                name = name,
+                                arguments = arguments
+                            }
                         });
                     }
-                    toolCallsJson = JsonConvert.SerializeObject(nativeList);
+                    toolCallsJson = JsonConvert.SerializeObject(wireList);
                 }
 
                 int promptTokens = token["usage"]?["prompt_tokens"]?.Value<int>() ?? 0;

@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using RimMind.Domain.Common;
 using RimMind.Domain.Llm;
+using RimMind.Domain.ValueObjects;
 using RimMind.ModelService.Balancing;
 using RimMind.ModelService.Models;
 using RimMind.ModelService.Protocol;
@@ -287,6 +288,123 @@ namespace RimMind.ModelService.Tests.Contracts
                     settings.EnsureDefaultEndpoints();
                     Assert.Equal(2, settings.endpoints.Count);
                 }));
+        }
+
+        [Fact]
+        public void AnthropicProtocolAdapter_aggregates_consecutive_tool_results_into_single_user_message()
+        {
+            ContractCaseRunner.Run(
+                ("multiple tool results are merged into one user message with multiple tool_result blocks", () =>
+                {
+                    var envelope = new LlmRequestEnvelope
+                    {
+                        Messages = new List<ChatMessage>
+                        {
+                            new ChatMessage { Role = "assistant", Content = "Calling tools" },
+                            new ChatMessage { Role = "tool", ToolCallId = "call_1", Content = "Result 1" },
+                            new ChatMessage { Role = "tool", ToolCallId = "call_2", Content = "Result 2" }
+                        }
+                    };
+                    var node = ModelEndpointPresets.CreateOpenCodeGoPreset();
+
+                    string json = AnthropicProtocolAdapter.BuildRequestJson(envelope, node);
+                    var parsed = Newtonsoft.Json.Linq.JObject.Parse(json);
+                    var messages = (Newtonsoft.Json.Linq.JArray)parsed["messages"]!;
+
+                    // Should have exactly 2 messages: 1 assistant, 1 user (with both tool results)
+                    Assert.Equal(2, messages.Count);
+                    Assert.Equal("assistant", messages[0]["role"]?.ToString());
+                    Assert.Equal("user", messages[1]["role"]?.ToString());
+
+                    var contentBlocks = (Newtonsoft.Json.Linq.JArray)messages[1]["content"]!;
+                    Assert.Equal(2, contentBlocks.Count);
+                    Assert.Equal("tool_result", contentBlocks[0]["type"]?.ToString());
+                    Assert.Equal("call_1", contentBlocks[0]["tool_use_id"]?.ToString());
+                    Assert.Equal("tool_result", contentBlocks[1]["type"]?.ToString());
+                    Assert.Equal("call_2", contentBlocks[1]["tool_use_id"]?.ToString());
+                }));
+        }
+
+        [Fact]
+        public void ProtocolAdapters_serialize_tool_calls_with_nested_function_schema()
+        {
+            ContractCaseRunner.Run(
+                ("OpenAI protocol tool calls serialize with type=function and function={name, arguments}", () =>
+                {
+                    string rawResponse = @"{
+                        ""choices"": [{
+                            ""message"": {
+                                ""content"": null,
+                                ""tool_calls"": [{
+                                    ""id"": ""call_abc123"",
+                                    ""type"": ""function"",
+                                    ""function"": {
+                                        ""name"": ""actions.emergency_flee"",
+                                        ""arguments"": ""{\""danger_level\"":2}""
+                                    }
+                                }]
+                            }
+                        }]
+                    }";
+
+                    var res = OpenAIProtocolAdapter.ParseResponse(rawResponse);
+                    Assert.True(res.IsOk);
+                    Assert.NotNull(res.Value.ToolCallsJson);
+
+                    var parsedCalls = Newtonsoft.Json.Linq.JArray.Parse(res.Value.ToolCallsJson!);
+                    Assert.Single(parsedCalls);
+                    Assert.Equal("call_abc123", parsedCalls[0]["id"]?.ToString());
+                    Assert.Equal("function", parsedCalls[0]["type"]?.ToString());
+                    Assert.NotNull(parsedCalls[0]["function"]);
+                    Assert.Equal("actions.emergency_flee", parsedCalls[0]["function"]?["name"]?.ToString());
+                    Assert.Equal("{\"danger_level\":2}", parsedCalls[0]["function"]?["arguments"]?.ToString());
+                }),
+                ("Anthropic protocol tool calls serialize with type=function and function={name, arguments}", () =>
+                {
+                    string rawResponse = @"{
+                        ""content"": [{
+                            ""type"": ""tool_use"",
+                            ""id"": ""toolu_xyz456"",
+                            ""name"": ""actions.triage_patient"",
+                            ""input"": { ""pawn_id"": 42 }
+                        }]
+                    }";
+
+                    var res = AnthropicProtocolAdapter.ParseResponse(rawResponse);
+                    Assert.True(res.IsOk);
+                    Assert.NotNull(res.Value.ToolCallsJson);
+
+                    var parsedCalls = Newtonsoft.Json.Linq.JArray.Parse(res.Value.ToolCallsJson!);
+                    Assert.Single(parsedCalls);
+                    Assert.Equal("toolu_xyz456", parsedCalls[0]["id"]?.ToString());
+                    Assert.Equal("function", parsedCalls[0]["type"]?.ToString());
+                    Assert.NotNull(parsedCalls[0]["function"]);
+                    Assert.Equal("actions.triage_patient", parsedCalls[0]["function"]?["name"]?.ToString());
+                    Assert.Contains("42", parsedCalls[0]["function"]?["arguments"]?.ToString());
+                }));
+        }
+
+        [Fact]
+        public async System.Threading.Tasks.Task ModelServiceClient_rejects_non_loopback_local_gateway_permanently()
+        {
+            var rogueNode = new ModelEndpointConfig
+            {
+                name = "Rogue Node",
+                endpoint = "https://malicious-external-site.com/v1",
+                providerType = ProviderType.LocalSubscriptionGateway,
+                isEnabled = true
+            };
+
+            using var client = new RimMind.ModelService.Client.ModelServiceClient(
+                () => new List<ModelEndpointConfig> { rogueNode },
+                () => BalancingStrategy.PriorityFailover);
+
+            var envelope = new LlmRequestEnvelope();
+            var result = await client.SendAsync(envelope);
+
+            Assert.True(result.IsErr);
+            Assert.Equal(RimMindErrorCode.ClientPermanentFailure, result.Error.Code);
+            Assert.Contains("Security violation", result.Error.Message);
         }
     }
 }

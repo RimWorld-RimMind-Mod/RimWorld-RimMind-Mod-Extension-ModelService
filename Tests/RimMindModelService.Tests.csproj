@@ -35,6 +35,8 @@
     <Compile Include="../Source/Balancing/LoadBalancer.cs" />
     <Compile Include="../Source/Protocol/OpenAIProtocolAdapter.cs" />
     <Compile Include="../Source/Protocol/AnthropicProtocolAdapter.cs" />
+    <Compile Include="../Source/Client/ModelServiceClient.cs" />
+    <Compile Include="../Source/Diagnostics/EndpointHealthProbe.cs" />
   </ItemGroup>
 
 </Project>
