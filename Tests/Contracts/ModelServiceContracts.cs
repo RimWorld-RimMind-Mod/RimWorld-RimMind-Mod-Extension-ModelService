@@ -451,5 +451,44 @@ namespace RimMind.ModelService.Tests.Contracts
                     Assert.Equal(0, settings.endpoints[0].priority);
                 }));
         }
+
+        [Fact]
+        public void ModelEndpointConfig_OpenCodeGo_is_configured_and_recognized()
+        {
+            var config = new ModelEndpointConfig
+            {
+                name = "OpenCode Go Direct",
+                endpoint = "https://opencode.ai/zen/go/v1",
+                modelName = "deepseek-v4.1-flash",
+                providerType = ProviderType.OpenAICompatible,
+                apiKey = "oc_sk_test",
+                isEnabled = true
+            };
+
+            Assert.True(config.isEnabled);
+            Assert.False(config.IsLoopbackAddress);
+            Assert.Equal(ProviderType.OpenAICompatible, config.providerType);
+        }
+
+        [Fact]
+        public async System.Threading.Tasks.Task EndpointHealthProbe_probes_OpenCodeGo_if_key_provided()
+        {
+            string? testKey = Environment.GetEnvironmentVariable("RIMMIND_TEST_API_KEY");
+            if (string.IsNullOrEmpty(testKey)) return;
+
+            var config = new ModelEndpointConfig
+            {
+                name = "OpenCode Go Direct",
+                endpoint = "https://opencode.ai/zen/go/v1",
+                modelName = "deepseek-v4.1-flash",
+                providerType = ProviderType.OpenAICompatible,
+                apiKey = testKey,
+                isEnabled = true
+            };
+
+            var (success, latency, msg) = await RimMind.ModelService.Diagnostics.EndpointHealthProbe.ProbeEndpointAsync(config);
+            Assert.True(success, $"Probe failed with message: {msg}");
+            Assert.True(latency > 0, "Latency should be positive");
+        }
     }
 }

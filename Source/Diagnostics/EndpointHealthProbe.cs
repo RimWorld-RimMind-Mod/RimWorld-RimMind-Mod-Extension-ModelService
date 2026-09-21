@@ -15,7 +15,7 @@ namespace RimMind.ModelService.Diagnostics
             AllowAutoRedirect = false
         })
         {
-            Timeout = TimeSpan.FromSeconds(5)
+            Timeout = TimeSpan.FromSeconds(15)
         };
 
         public static async Task<(bool success, int latencyMs, string message)> ProbeEndpointAsync(
@@ -51,6 +51,10 @@ namespace RimMind.ModelService.Diagnostics
                     {
                         request.Headers.TryAddWithoutValidation("Authorization", "Bearer " + endpoint.apiKey);
                     }
+                }
+                if (!string.IsNullOrEmpty(endpoint.endpoint) && (endpoint.endpoint.IndexOf("opencode", StringComparison.OrdinalIgnoreCase) >= 0 || (!string.IsNullOrEmpty(endpoint.apiKey) && endpoint.apiKey.IndexOf("oc_sk_", StringComparison.OrdinalIgnoreCase) >= 0)))
+                {
+                    request.Headers.TryAddWithoutValidation("x-opencode-session", "rimmind-probe");
                 }
 
                 using var response = await HttpClient.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, ct).ConfigureAwait(false);

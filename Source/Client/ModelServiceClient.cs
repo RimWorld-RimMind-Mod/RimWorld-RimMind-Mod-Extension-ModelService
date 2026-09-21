@@ -133,6 +133,10 @@ namespace RimMind.ModelService.Client
                     {
                         request.Headers.TryAddWithoutValidation("Authorization", "Bearer " + node.apiKey);
                     }
+                    if (!string.IsNullOrEmpty(requestUrl) && (requestUrl.IndexOf("opencode", StringComparison.OrdinalIgnoreCase) >= 0 || (!string.IsNullOrEmpty(node.apiKey) && node.apiKey.IndexOf("oc_sk_", StringComparison.OrdinalIgnoreCase) >= 0)))
+                    {
+                        request.Headers.TryAddWithoutValidation("x-opencode-session", "rimmind-" + Guid.NewGuid().ToString("N").Substring(0, 12));
+                    }
                 }
 
                 using var content = new StringContent(payloadJson, Encoding.UTF8, "application/json");
