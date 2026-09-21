@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <LanguageData>
   <!-- Settings Window -->
-  <RimMind.ModelService.Settings.Category>RimMind - Model Service Extension</RimMind.ModelService.Settings.Category>
+  <RimMind.ModelService.Settings.Category>Model Service</RimMind.ModelService.Settings.Category>
   <RimMind.ModelService.Settings.EnableService>Enable Extended Model Service</RimMind.ModelService.Settings.EnableService>
   <RimMind.ModelService.Settings.EnableService.Desc>When enabled, manages and expands the AI request pipeline with multi-endpoint routing and automatic failover.</RimMind.ModelService.Settings.EnableService.Desc>
 

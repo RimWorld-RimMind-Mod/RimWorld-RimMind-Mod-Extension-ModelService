@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <LanguageData>
   <!-- Settings Window -->
-  <RimMind.ModelService.Settings.Category>RimMind - 模型扩展服务</RimMind.ModelService.Settings.Category>
+  <RimMind.ModelService.Settings.Category>模型服务</RimMind.ModelService.Settings.Category>
   <RimMind.ModelService.Settings.EnableService>启用扩展模型服务</RimMind.ModelService.Settings.EnableService>
   <RimMind.ModelService.Settings.EnableService.Desc>启用后，将接管并扩展 RimMind 的 AI 请求分发管道，支持多端点调度与容灾故障转移。</RimMind.ModelService.Settings.EnableService.Desc>
 
