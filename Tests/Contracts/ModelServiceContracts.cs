@@ -406,5 +406,50 @@ namespace RimMind.ModelService.Tests.Contracts
             Assert.Equal(RimMindErrorCode.ClientPermanentFailure, result.Error.Code);
             Assert.Contains("Security violation", result.Error.Message);
         }
+
+        [Fact]
+        public void ModelServiceSettings_endpoints_reordering_and_priority_sync()
+        {
+            ContractCaseRunner.Run(
+                ("EnsureDefaultEndpoints seeds Codex and OpenCode Go presets in order", () =>
+                {
+                    var settings = new ModelServiceSettings();
+                    settings.endpoints.Clear();
+                    settings.EnsureDefaultEndpoints();
+
+                    Assert.Equal(2, settings.endpoints.Count);
+                    Assert.Equal(0, settings.endpoints[0].priority);
+                    Assert.Equal(1, settings.endpoints[1].priority);
+                    Assert.Contains("Codex", settings.endpoints[0].name);
+                    Assert.Contains("OpenCode Go", settings.endpoints[1].name);
+                }),
+                ("reordering endpoints updates priorities deterministically", () =>
+                {
+                    var settings = new ModelServiceSettings();
+                    settings.endpoints.Clear();
+                    settings.EnsureDefaultEndpoints();
+
+                    // Swap index 1 to 0 (Move Up)
+                    var temp = settings.endpoints[1];
+                    settings.endpoints[1] = settings.endpoints[0];
+                    settings.endpoints[0] = temp;
+                    for (int i = 0; i < settings.endpoints.Count; i++)
+                        settings.endpoints[i].priority = i;
+
+                    Assert.Contains("OpenCode Go", settings.endpoints[0].name);
+                    Assert.Equal(0, settings.endpoints[0].priority);
+                    Assert.Contains("Codex", settings.endpoints[1].name);
+                    Assert.Equal(1, settings.endpoints[1].priority);
+
+                    // Delete index 0 leaves remaining item with priority 0
+                    settings.endpoints.RemoveAt(0);
+                    for (int i = 0; i < settings.endpoints.Count; i++)
+                        settings.endpoints[i].priority = i;
+
+                    Assert.Single(settings.endpoints);
+                    Assert.Contains("Codex", settings.endpoints[0].name);
+                    Assert.Equal(0, settings.endpoints[0].priority);
+                }));
+        }
     }
 }
