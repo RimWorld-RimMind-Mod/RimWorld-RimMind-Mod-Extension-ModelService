@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ModMetaData>
+  <name>RimMind - Extension - ModelService</name>
+  <author>mcocdaa</author>
+  <packageId>mcocdaa.RimMindModelService</packageId>
+  <modVersion>1.0.0</modVersion>
+  <supportedVersions>
+    <li>1.6</li>
+  </supportedVersions>
+  <description>Extended Model Service Provider and Local Gateway adapter for RimMind. Adds support for multi-provider routing (OpenAI-compatible, Anthropic Claude Messages, Local Subscription Gateways / sub2api / newapi / Codex Proxy) with auto-failover, load balancing, and connectivity diagnostics. [v1.0]</description>
+  <modDependencies>
+    <li>
+      <packageId>brrainz.harmony</packageId>
+      <displayName>Harmony</displayName>
+      <steamWorkshopUrl>steam://url/CommunityFilePage/2009463077</steamWorkshopUrl>
+      <downloadUrl>https://github.com/pardeike/Harmony/releases</downloadUrl>
+    </li>
+    <li>
+      <packageId>mcocdaa.RimMindCore</packageId>
+      <displayName>RimMind - Core</displayName>
+      <downloadUrl>https://github.com/RimWorld-RimMind-Mod/RimWorld-RimMind-Mod-Core</downloadUrl>
+    </li>
+  </modDependencies>
+  <loadAfter>
+    <li>brrainz.harmony</li>
+    <li>mcocdaa.RimMindCore</li>
+  </loadAfter>
+</ModMetaData>

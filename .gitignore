@@ -1,0 +1,6 @@
+# Build outputs
+1.6/Assemblies/
+bin/
+obj/
+*.user
+*.suo

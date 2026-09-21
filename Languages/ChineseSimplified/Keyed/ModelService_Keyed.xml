@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LanguageData>
+  <!-- Settings Window -->
+  <RimMind.ModelService.Settings.Category>RimMind - 模型扩展服务</RimMind.ModelService.Settings.Category>
+  <RimMind.ModelService.Settings.EnableService>启用扩展模型服务</RimMind.ModelService.Settings.EnableService>
+  <RimMind.ModelService.Settings.EnableService.Desc>启用后，将接管并扩展 RimMind 的 AI 请求分发管道，支持多端点调度与容灾故障转移。</RimMind.ModelService.Settings.EnableService.Desc>
+
+  <RimMind.ModelService.Settings.BalancingStrategy>负载均衡与调度策略</RimMind.ModelService.Settings.BalancingStrategy>
+  <RimMind.ModelService.Settings.BalancingStrategy.PriorityFailover>主备优先容灾 (Priority Failover)</RimMind.ModelService.Settings.BalancingStrategy.PriorityFailover>
+  <RimMind.ModelService.Settings.BalancingStrategy.RoundRobin>加权轮询分流 (Round Robin)</RimMind.ModelService.Settings.BalancingStrategy.RoundRobin>
+
+  <RimMind.ModelService.Settings.EndpointsSection>模型端点节点配置池</RimMind.ModelService.Settings.EndpointsSection>
+  <RimMind.ModelService.Settings.AddCodexPreset>+ Codex 预设</RimMind.ModelService.Settings.AddCodexPreset>
+  <RimMind.ModelService.Settings.AddOpenCodeGoPreset>+ OpenCode Go 预设</RimMind.ModelService.Settings.AddOpenCodeGoPreset>
+  <RimMind.ModelService.Settings.AddCustomEndpoint>+ 自定义节点</RimMind.ModelService.Settings.AddCustomEndpoint>
+  <RimMind.ModelService.Settings.RemoveEndpoint>删除</RimMind.ModelService.Settings.RemoveEndpoint>
+  <RimMind.ModelService.Settings.TestAllEndpoints>测试全部</RimMind.ModelService.Settings.TestAllEndpoints>
+  <RimMind.ModelService.Settings.NoEndpoints>当前端点池为空，请点击上方按钮添加预设或自定义节点。</RimMind.ModelService.Settings.NoEndpoints>
+
+  <!-- Endpoint Item Fields -->
+  <RimMind.ModelService.Endpoint.PrimaryNode>#{0} 主节点</RimMind.ModelService.Endpoint.PrimaryNode>
+  <RimMind.ModelService.Endpoint.BackupNode>#{0} 备用</RimMind.ModelService.Endpoint.BackupNode>
+  <RimMind.ModelService.Endpoint.NameLabel>名称:</RimMind.ModelService.Endpoint.NameLabel>
+  <RimMind.ModelService.Endpoint.ModelLabel>模型:</RimMind.ModelService.Endpoint.ModelLabel>
+  <RimMind.ModelService.Endpoint.Enabled>启用</RimMind.ModelService.Endpoint.Enabled>
+  <RimMind.ModelService.Endpoint.TestPing>Ping 测试</RimMind.ModelService.Endpoint.TestPing>
+  <RimMind.ModelService.Endpoint.ShowKey>显示</RimMind.ModelService.Endpoint.ShowKey>
+  <RimMind.ModelService.Endpoint.HideKey>隐藏</RimMind.ModelService.Endpoint.HideKey>
+  <RimMind.ModelService.Endpoint.StatusHealthy>健康</RimMind.ModelService.Endpoint.StatusHealthy>
+  <RimMind.ModelService.Endpoint.StatusUnhealthy>不可用</RimMind.ModelService.Endpoint.StatusUnhealthy>
+  <RimMind.ModelService.Endpoint.StatusTesting>检测中...</RimMind.ModelService.Endpoint.StatusTesting>
+
+  <!-- Providers -->
+  <RimMind.ModelService.Provider.OpenAICompatible>OpenAI 兼容协议</RimMind.ModelService.Provider.OpenAICompatible>
+  <RimMind.ModelService.Provider.AnthropicClaude>Anthropic Claude 原生</RimMind.ModelService.Provider.AnthropicClaude>
+  <RimMind.ModelService.Provider.LocalSubscriptionGateway>本地网关 (sub2api)</RimMind.ModelService.Provider.LocalSubscriptionGateway>
+
+  <!-- Security & Validation Messages -->
+  <RimMind.ModelService.Security.LoopbackLocked>🛡️ 本地回环安全锁定</RimMind.ModelService.Security.LoopbackLocked>
+  <RimMind.ModelService.Security.LoopbackLocked.Desc>当前端点已绑定本地回环地址 (127.0.0.1 或 localhost)，属于受保护的本地订阅网关安全沙盒环境。</RimMind.ModelService.Security.LoopbackLocked.Desc>
+  <RimMind.ModelService.Security.LoopbackBlocked>⚠️ 凭据安全拦截</RimMind.ModelService.Security.LoopbackBlocked>
+  <RimMind.ModelService.Security.LoopbackViolation>安全拦截: 本地订阅代理协议仅允许绑定本地回环地址 (127.0.0.1 或 localhost)，已拒绝非本地外部地址以防凭据外泄。</RimMind.ModelService.Security.LoopbackViolation>
+</LanguageData>

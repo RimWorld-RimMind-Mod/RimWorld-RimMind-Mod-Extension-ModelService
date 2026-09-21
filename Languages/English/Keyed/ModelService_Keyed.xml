@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LanguageData>
+  <!-- Settings Window -->
+  <RimMind.ModelService.Settings.Category>RimMind - Model Service Extension</RimMind.ModelService.Settings.Category>
+  <RimMind.ModelService.Settings.EnableService>Enable Extended Model Service</RimMind.ModelService.Settings.EnableService>
+  <RimMind.ModelService.Settings.EnableService.Desc>When enabled, manages and expands the AI request pipeline with multi-endpoint routing and automatic failover.</RimMind.ModelService.Settings.EnableService.Desc>
+
+  <RimMind.ModelService.Settings.BalancingStrategy>Load Balancing Strategy</RimMind.ModelService.Settings.BalancingStrategy>
+  <RimMind.ModelService.Settings.BalancingStrategy.PriorityFailover>Priority Failover</RimMind.ModelService.Settings.BalancingStrategy.PriorityFailover>
+  <RimMind.ModelService.Settings.BalancingStrategy.RoundRobin>Round Robin</RimMind.ModelService.Settings.BalancingStrategy.RoundRobin>
+
+  <RimMind.ModelService.Settings.EndpointsSection>Model Endpoint Pool</RimMind.ModelService.Settings.EndpointsSection>
+  <RimMind.ModelService.Settings.AddCodexPreset>+ Codex Preset</RimMind.ModelService.Settings.AddCodexPreset>
+  <RimMind.ModelService.Settings.AddOpenCodeGoPreset>+ OpenCode Go Preset</RimMind.ModelService.Settings.AddOpenCodeGoPreset>
+  <RimMind.ModelService.Settings.AddCustomEndpoint>+ Custom Node</RimMind.ModelService.Settings.AddCustomEndpoint>
+  <RimMind.ModelService.Settings.RemoveEndpoint>Delete</RimMind.ModelService.Settings.RemoveEndpoint>
+  <RimMind.ModelService.Settings.TestAllEndpoints>Test All</RimMind.ModelService.Settings.TestAllEndpoints>
+  <RimMind.ModelService.Settings.NoEndpoints>Endpoint pool is empty. Click the buttons above to add presets or a custom node.</RimMind.ModelService.Settings.NoEndpoints>
+
+  <!-- Endpoint Item Fields -->
+  <RimMind.ModelService.Endpoint.PrimaryNode>#{0} Primary</RimMind.ModelService.Endpoint.PrimaryNode>
+  <RimMind.ModelService.Endpoint.BackupNode>#{0} Backup</RimMind.ModelService.Endpoint.BackupNode>
+  <RimMind.ModelService.Endpoint.NameLabel>Name:</RimMind.ModelService.Endpoint.NameLabel>
+  <RimMind.ModelService.Endpoint.ModelLabel>Model:</RimMind.ModelService.Endpoint.ModelLabel>
+  <RimMind.ModelService.Endpoint.Enabled>Enabled</RimMind.ModelService.Endpoint.Enabled>
+  <RimMind.ModelService.Endpoint.TestPing>Ping Test</RimMind.ModelService.Endpoint.TestPing>
+  <RimMind.ModelService.Endpoint.ShowKey>Show</RimMind.ModelService.Endpoint.ShowKey>
+  <RimMind.ModelService.Endpoint.HideKey>Hide</RimMind.ModelService.Endpoint.HideKey>
+  <RimMind.ModelService.Endpoint.StatusHealthy>Healthy</RimMind.ModelService.Endpoint.StatusHealthy>
+  <RimMind.ModelService.Endpoint.StatusUnhealthy>Unhealthy</RimMind.ModelService.Endpoint.StatusUnhealthy>
+  <RimMind.ModelService.Endpoint.StatusTesting>Probing...</RimMind.ModelService.Endpoint.StatusTesting>
+
+  <!-- Providers -->
+  <RimMind.ModelService.Provider.OpenAICompatible>OpenAI Compatible</RimMind.ModelService.Provider.OpenAICompatible>
+  <RimMind.ModelService.Provider.AnthropicClaude>Anthropic Claude Native</RimMind.ModelService.Provider.AnthropicClaude>
+  <RimMind.ModelService.Provider.LocalSubscriptionGateway>Local Gateway (sub2api)</RimMind.ModelService.Provider.LocalSubscriptionGateway>
+
+  <!-- Security & Validation Messages -->
+  <RimMind.ModelService.Security.LoopbackLocked>🛡️ Local Loopback Secured</RimMind.ModelService.Security.LoopbackLocked>
+  <RimMind.ModelService.Security.LoopbackLocked.Desc>Endpoint is bound to local loopback (127.0.0.1 / localhost), operating within a protected subscription gateway sandbox.</RimMind.ModelService.Security.LoopbackLocked.Desc>
+  <RimMind.ModelService.Security.LoopbackBlocked>⚠️ Security Blocked</RimMind.ModelService.Security.LoopbackBlocked>
+  <RimMind.ModelService.Security.LoopbackViolation>Security Warning: Subscription proxy provider must bind to loopback address (127.0.0.1 / localhost) to prevent credential leakage.</RimMind.ModelService.Security.LoopbackViolation>
+</LanguageData>

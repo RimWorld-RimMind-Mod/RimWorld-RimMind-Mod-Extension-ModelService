@@ -1,0 +1,42 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <GameVersion Condition=" '$(GameVersion)' == '' ">1.6</GameVersion>
+    <OutputType>Library</OutputType>
+    <TargetFramework>net48</TargetFramework>
+    <PlatformTarget>x64</PlatformTarget>
+    <RootNamespace>RimMind.ModelService</RootNamespace>
+    <AssemblyName>RimMindModelService</AssemblyName>
+    <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
+    <OutputPath>../$(GameVersion)/Assemblies/</OutputPath>
+    <LangVersion>9.0</LangVersion>
+    <Nullable>enable</Nullable>
+    <Version>1.0.0</Version>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <DefineConstants>$(DefineConstants);V$(GameVersion.Replace('.', '_'))</DefineConstants>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Krafs.Rimworld.Ref" Version="$(GameVersion).*-*" PrivateAssets="All" />
+    <PackageReference Include="Lib.Harmony.Ref" Version="2.*" PrivateAssets="All" />
+    <PackageReference Include="Newtonsoft.Json" Version="13.0.*" PrivateAssets="All" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Reference Include="0_RimMindDomain">
+      <HintPath>../../RimMind-Core/$(GameVersion)/Assemblies/0_RimMindDomain.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="1_RimMindApplication">
+      <HintPath>../../RimMind-Core/$(GameVersion)/Assemblies/1_RimMindApplication.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="2_RimMindCore">
+      <HintPath>../../RimMind-Core/$(GameVersion)/Assemblies/2_RimMindCore.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+  </ItemGroup>
+
+</Project>
