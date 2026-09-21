@@ -19,7 +19,7 @@ namespace RimMind.ModelService.Models
         public static ModelEndpointConfig CreateOpenCodeGoPreset(int priority = 1) => new ModelEndpointConfig
         {
             id = Guid.NewGuid().ToString("N"),
-            name = "OpenCode Go (订阅直连)",
+            name = "OpenCode Go (Direct)",
             endpoint = "https://opencode.ai/zen/go/v1",
             modelName = "deepseek-v4.1-flash",
             providerType = ProviderType.OpenCodeGo,

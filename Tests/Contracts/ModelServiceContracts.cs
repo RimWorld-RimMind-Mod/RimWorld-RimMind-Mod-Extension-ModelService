@@ -227,7 +227,7 @@ namespace RimMind.ModelService.Tests.Contracts
                 ("OpenCode Go preset has valid configuration and satisfies cloud endpoint routing", () =>
                 {
                     var openCode = ModelEndpointPresets.CreateOpenCodeGoPreset(1);
-                    Assert.Equal("OpenCode Go (订阅直连)", openCode.name);
+                    Assert.Equal("OpenCode Go (Direct)", openCode.name);
                     Assert.Equal("https://opencode.ai/zen/go/v1", openCode.endpoint);
                     Assert.Equal("deepseek-v4.1-flash", openCode.modelName);
                     Assert.Equal(ProviderType.OpenCodeGo, openCode.providerType);
@@ -242,7 +242,7 @@ namespace RimMind.ModelService.Tests.Contracts
                     Assert.Equal(2, c1.priority);
 
                     var o1 = ModelEndpointConfig.CreateOpenCodeGoPreset(3);
-                    Assert.Equal("OpenCode Go (订阅直连)", o1.name);
+                    Assert.Equal("OpenCode Go (Direct)", o1.name);
                     Assert.Equal(3, o1.priority);
                 }));
         }
@@ -263,7 +263,7 @@ namespace RimMind.ModelService.Tests.Contracts
                     Assert.Equal(ProviderType.LocalSubscriptionGateway, codex.providerType);
 
                     var openCode = settings.endpoints[1];
-                    Assert.Equal("OpenCode Go (订阅直连)", openCode.name);
+                    Assert.Equal("OpenCode Go (Direct)", openCode.name);
                     Assert.Equal("https://opencode.ai/zen/go/v1", openCode.endpoint);
                     Assert.Equal(ProviderType.OpenCodeGo, openCode.providerType);
                 }),
@@ -277,7 +277,7 @@ namespace RimMind.ModelService.Tests.Contracts
                     settings.ResetToDefault();
                     Assert.Equal(2, settings.endpoints.Count);
                     Assert.Equal("Codex Local Gateway (sub2api)", settings.endpoints[0].name);
-                    Assert.Equal("OpenCode Go (订阅直连)", settings.endpoints[1].name);
+                    Assert.Equal("OpenCode Go (Direct)", settings.endpoints[1].name);
                 }),
                 ("EnsureDefaultEndpoints seeds presets when list is empty", () =>
                 {
