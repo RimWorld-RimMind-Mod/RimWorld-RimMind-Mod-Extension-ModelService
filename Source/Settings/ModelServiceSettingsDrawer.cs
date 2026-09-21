@@ -188,6 +188,7 @@ namespace RimMind.ModelService.Settings
                     ProviderType.OpenAICompatible => "RimMind.ModelService.Provider.OpenAICompatible".Translate(),
                     ProviderType.AnthropicClaude => "RimMind.ModelService.Provider.AnthropicClaude".Translate(),
                     ProviderType.LocalSubscriptionGateway => "RimMind.ModelService.Provider.LocalSubscriptionGateway".Translate(),
+                    ProviderType.OpenCodeGo => "RimMind.ModelService.Provider.OpenCodeGo".Translate(),
                     _ => endpoint.providerType.ToString()
                 };
 
@@ -198,7 +199,8 @@ namespace RimMind.ModelService.Settings
                     {
                         new FloatMenuOption("RimMind.ModelService.Provider.OpenAICompatible".Translate(), () => endpoint.providerType = ProviderType.OpenAICompatible),
                         new FloatMenuOption("RimMind.ModelService.Provider.AnthropicClaude".Translate(), () => endpoint.providerType = ProviderType.AnthropicClaude),
-                        new FloatMenuOption("RimMind.ModelService.Provider.LocalSubscriptionGateway".Translate(), () => endpoint.providerType = ProviderType.LocalSubscriptionGateway)
+                        new FloatMenuOption("RimMind.ModelService.Provider.LocalSubscriptionGateway".Translate(), () => endpoint.providerType = ProviderType.LocalSubscriptionGateway),
+                        new FloatMenuOption("RimMind.ModelService.Provider.OpenCodeGo".Translate(), () => endpoint.providerType = ProviderType.OpenCodeGo)
                     };
                     Find.WindowStack.Add(new FloatMenu(options));
                 }
@@ -320,6 +322,21 @@ namespace RimMind.ModelService.Settings
                     string tip = isLoopback
                         ? "RimMind.ModelService.Security.LoopbackLocked.Desc".Translate()
                         : "RimMind.ModelService.Security.LoopbackViolation".Translate();
+                    TooltipHandler.TipRegion(bannerRect, tip);
+                }
+                else if (endpoint.providerType == ProviderType.OpenCodeGo)
+                {
+                    string bannerText = "RimMind.ModelService.Security.OpenCodeGoSessionRouted".Translate();
+                    float bannerX = statusX + 165f;
+                    float bannerWidth = rightXMax - bannerX;
+                    var bannerRect = new Rect(bannerX, row4Y + 2f, bannerWidth, 24f);
+
+                    Color prevColor = GUI.color;
+                    GUI.color = new Color(0.4f, 0.75f, 1.0f);
+                    Widgets.Label(bannerRect, bannerText);
+                    GUI.color = prevColor;
+
+                    string tip = "RimMind.ModelService.Security.OpenCodeGoSessionRouted.Desc".Translate();
                     TooltipHandler.TipRegion(bannerRect, tip);
                 }
 

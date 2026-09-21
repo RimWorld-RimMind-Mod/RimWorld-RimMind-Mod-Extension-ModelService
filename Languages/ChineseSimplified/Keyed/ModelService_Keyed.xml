@@ -34,10 +34,13 @@
   <RimMind.ModelService.Provider.OpenAICompatible>OpenAI 兼容协议</RimMind.ModelService.Provider.OpenAICompatible>
   <RimMind.ModelService.Provider.AnthropicClaude>Anthropic Claude 原生</RimMind.ModelService.Provider.AnthropicClaude>
   <RimMind.ModelService.Provider.LocalSubscriptionGateway>本地网关 (sub2api)</RimMind.ModelService.Provider.LocalSubscriptionGateway>
+  <RimMind.ModelService.Provider.OpenCodeGo>OpenCode Go 订阅直连</RimMind.ModelService.Provider.OpenCodeGo>
 
   <!-- Security & Validation Messages -->
   <RimMind.ModelService.Security.LoopbackLocked>🛡️ 本地回环安全锁定</RimMind.ModelService.Security.LoopbackLocked>
   <RimMind.ModelService.Security.LoopbackLocked.Desc>当前端点已绑定本地回环地址 (127.0.0.1 或 localhost)，属于受保护的本地订阅网关安全沙盒环境。</RimMind.ModelService.Security.LoopbackLocked.Desc>
   <RimMind.ModelService.Security.LoopbackBlocked>⚠️ 凭据安全拦截</RimMind.ModelService.Security.LoopbackBlocked>
   <RimMind.ModelService.Security.LoopbackViolation>安全拦截: 本地订阅代理协议仅允许绑定本地回环地址 (127.0.0.1 或 localhost)，已拒绝非本地外部地址以防凭据外泄。</RimMind.ModelService.Security.LoopbackViolation>
+  <RimMind.ModelService.Security.OpenCodeGoSessionRouted>🌐 OpenCode Go 订阅直连</RimMind.ModelService.Security.OpenCodeGoSessionRouted>
+  <RimMind.ModelService.Security.OpenCodeGoSessionRouted.Desc>自动挂载 x-opencode-session 会话路由请求头，原生适配 OpenCode Go 订阅网关。</RimMind.ModelService.Security.OpenCodeGoSessionRouted.Desc>
 </LanguageData>

@@ -53,6 +53,7 @@ namespace RimMind.ModelService.Diagnostics
                     }
                 }
                 if (!string.IsNullOrEmpty(endpoint.endpoint) && (endpoint.endpoint.IndexOf("opencode", StringComparison.OrdinalIgnoreCase) >= 0 || (!string.IsNullOrEmpty(endpoint.apiKey) && endpoint.apiKey.IndexOf("oc_sk_", StringComparison.OrdinalIgnoreCase) >= 0)))
+                if (endpoint.providerType == ProviderType.OpenCodeGo || (!string.IsNullOrEmpty(endpoint.endpoint) && (endpoint.endpoint.IndexOf("opencode", StringComparison.OrdinalIgnoreCase) >= 0 || (!string.IsNullOrEmpty(endpoint.apiKey) && endpoint.apiKey.IndexOf("oc_sk_", StringComparison.OrdinalIgnoreCase) >= 0))))
                 {
                     request.Headers.TryAddWithoutValidation("x-opencode-session", "rimmind-probe");
                 }

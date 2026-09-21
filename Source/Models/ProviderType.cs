@@ -4,7 +4,8 @@ namespace RimMind.ModelService.Models
     {
         OpenAICompatible = 0,
         AnthropicClaude = 1,
-        LocalSubscriptionGateway = 2
+        LocalSubscriptionGateway = 2,
+        OpenCodeGo = 3
     }
 
     public enum BalancingStrategy

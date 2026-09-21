@@ -123,6 +123,21 @@ namespace RimMind.ModelService.Client
                     request.Headers.TryAddWithoutValidation("x-api-key", node.apiKey);
                     request.Headers.TryAddWithoutValidation("anthropic-version", "2023-06-01");
                 }
+                else if (node.providerType == ProviderType.OpenCodeGo)
+                {
+                    requestUrl = node.endpoint.TrimEnd('/') + "/chat/completions";
+                    payloadJson = OpenAIProtocolAdapter.BuildRequestJson(envelope, node);
+
+                    request.RequestUri = new Uri(requestUrl);
+                    if (!string.IsNullOrEmpty(node.apiKey))
+                    {
+                        request.Headers.TryAddWithoutValidation("Authorization", "Bearer " + node.apiKey);
+                    }
+                    string sessionGuid = string.IsNullOrEmpty(envelope.RequestId)
+                        ? Guid.NewGuid().ToString("N").Substring(0, 16)
+                        : envelope.RequestId;
+                    request.Headers.TryAddWithoutValidation("x-opencode-session", "rimmind-" + sessionGuid);
+                }
                 else // OpenAICompatible or LocalSubscriptionGateway
                 {
                     requestUrl = node.endpoint.TrimEnd('/') + "/chat/completions";

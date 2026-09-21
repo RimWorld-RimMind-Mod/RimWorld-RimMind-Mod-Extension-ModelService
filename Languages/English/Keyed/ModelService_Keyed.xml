@@ -34,10 +34,13 @@
   <RimMind.ModelService.Provider.OpenAICompatible>OpenAI Compatible</RimMind.ModelService.Provider.OpenAICompatible>
   <RimMind.ModelService.Provider.AnthropicClaude>Anthropic Claude Native</RimMind.ModelService.Provider.AnthropicClaude>
   <RimMind.ModelService.Provider.LocalSubscriptionGateway>Local Gateway (sub2api)</RimMind.ModelService.Provider.LocalSubscriptionGateway>
+  <RimMind.ModelService.Provider.OpenCodeGo>OpenCode Go Direct</RimMind.ModelService.Provider.OpenCodeGo>
 
   <!-- Security & Validation Messages -->
   <RimMind.ModelService.Security.LoopbackLocked>🛡️ Local Loopback Secured</RimMind.ModelService.Security.LoopbackLocked>
   <RimMind.ModelService.Security.LoopbackLocked.Desc>Endpoint is bound to local loopback (127.0.0.1 / localhost), operating within a protected subscription gateway sandbox.</RimMind.ModelService.Security.LoopbackLocked.Desc>
   <RimMind.ModelService.Security.LoopbackBlocked>⚠️ Security Blocked</RimMind.ModelService.Security.LoopbackBlocked>
   <RimMind.ModelService.Security.LoopbackViolation>Security Warning: Subscription proxy provider must bind to loopback address (127.0.0.1 / localhost) to prevent credential leakage.</RimMind.ModelService.Security.LoopbackViolation>
+  <RimMind.ModelService.Security.OpenCodeGoSessionRouted>🌐 OpenCode Go Direct</RimMind.ModelService.Security.OpenCodeGoSessionRouted>
+  <RimMind.ModelService.Security.OpenCodeGoSessionRouted.Desc>Automatically mounts x-opencode-session header for native OpenCode Go subscription routing.</RimMind.ModelService.Security.OpenCodeGoSessionRouted.Desc>
 </LanguageData>

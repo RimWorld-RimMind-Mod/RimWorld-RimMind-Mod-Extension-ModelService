@@ -224,16 +224,16 @@ namespace RimMind.ModelService.Tests.Contracts
                     Assert.Equal(0, codex.priority);
                     Assert.True(LocalLoopbackValidator.IsLoopbackAddress(codex.endpoint));
                 }),
-                ("OpenCode Go preset has valid configuration and satisfies loopback security", () =>
+                ("OpenCode Go preset has valid configuration and satisfies cloud endpoint routing", () =>
                 {
                     var openCode = ModelEndpointPresets.CreateOpenCodeGoPreset(1);
-                    Assert.Equal("OpenCode Go Gateway (sub2api)", openCode.name);
-                    Assert.Equal("http://127.0.0.1:8080/v1", openCode.endpoint);
-                    Assert.Equal("claude-3-5-sonnet-20241022", openCode.modelName);
-                    Assert.Equal(ProviderType.LocalSubscriptionGateway, openCode.providerType);
+                    Assert.Equal("OpenCode Go (订阅直连)", openCode.name);
+                    Assert.Equal("https://opencode.ai/zen/go/v1", openCode.endpoint);
+                    Assert.Equal("deepseek-v4.1-flash", openCode.modelName);
+                    Assert.Equal(ProviderType.OpenCodeGo, openCode.providerType);
                     Assert.True(openCode.isEnabled);
                     Assert.Equal(1, openCode.priority);
-                    Assert.True(LocalLoopbackValidator.IsLoopbackAddress(openCode.endpoint));
+                    Assert.False(openCode.IsLoopbackAddress);
                 }),
                 ("ModelEndpointConfig convenience static factories match preset factories", () =>
                 {
@@ -242,7 +242,7 @@ namespace RimMind.ModelService.Tests.Contracts
                     Assert.Equal(2, c1.priority);
 
                     var o1 = ModelEndpointConfig.CreateOpenCodeGoPreset(3);
-                    Assert.Equal("OpenCode Go Gateway (sub2api)", o1.name);
+                    Assert.Equal("OpenCode Go (订阅直连)", o1.name);
                     Assert.Equal(3, o1.priority);
                 }));
         }
@@ -263,9 +263,9 @@ namespace RimMind.ModelService.Tests.Contracts
                     Assert.Equal(ProviderType.LocalSubscriptionGateway, codex.providerType);
 
                     var openCode = settings.endpoints[1];
-                    Assert.Equal("OpenCode Go Gateway (sub2api)", openCode.name);
-                    Assert.Equal("http://127.0.0.1:8080/v1", openCode.endpoint);
-                    Assert.Equal(ProviderType.LocalSubscriptionGateway, openCode.providerType);
+                    Assert.Equal("OpenCode Go (订阅直连)", openCode.name);
+                    Assert.Equal("https://opencode.ai/zen/go/v1", openCode.endpoint);
+                    Assert.Equal(ProviderType.OpenCodeGo, openCode.providerType);
                 }),
                 ("ResetToDefault clears and restores default presets", () =>
                 {
@@ -277,7 +277,7 @@ namespace RimMind.ModelService.Tests.Contracts
                     settings.ResetToDefault();
                     Assert.Equal(2, settings.endpoints.Count);
                     Assert.Equal("Codex Local Gateway (sub2api)", settings.endpoints[0].name);
-                    Assert.Equal("OpenCode Go Gateway (sub2api)", settings.endpoints[1].name);
+                    Assert.Equal("OpenCode Go (订阅直连)", settings.endpoints[1].name);
                 }),
                 ("EnsureDefaultEndpoints seeds presets when list is empty", () =>
                 {
@@ -460,14 +460,14 @@ namespace RimMind.ModelService.Tests.Contracts
                 name = "OpenCode Go Direct",
                 endpoint = "https://opencode.ai/zen/go/v1",
                 modelName = "deepseek-v4.1-flash",
-                providerType = ProviderType.OpenAICompatible,
+                providerType = ProviderType.OpenCodeGo,
                 apiKey = "oc_sk_test",
                 isEnabled = true
             };
 
             Assert.True(config.isEnabled);
             Assert.False(config.IsLoopbackAddress);
-            Assert.Equal(ProviderType.OpenAICompatible, config.providerType);
+            Assert.Equal(ProviderType.OpenCodeGo, config.providerType);
         }
 
         [Fact]
@@ -481,7 +481,7 @@ namespace RimMind.ModelService.Tests.Contracts
                 name = "OpenCode Go Direct",
                 endpoint = "https://opencode.ai/zen/go/v1",
                 modelName = "deepseek-v4.1-flash",
-                providerType = ProviderType.OpenAICompatible,
+                providerType = ProviderType.OpenCodeGo,
                 apiKey = testKey,
                 isEnabled = true
             };
