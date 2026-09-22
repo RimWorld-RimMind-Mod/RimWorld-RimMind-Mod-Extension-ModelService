@@ -490,5 +490,119 @@ namespace RimMind.ModelService.Tests.Contracts
             Assert.True(success, $"Probe failed with message: {msg}");
             Assert.True(latency > 0, "Latency should be positive");
         }
+
+        [Fact]
+        public void OpenCodeGoClientFactory_injects_metadata_and_creates_configured_client()
+        {
+            var factory = new RimMind.ModelService.Client.OpenCodeGoClientFactory();
+            Assert.Equal("opencode", factory.ProviderId);
+            Assert.True(factory.RequiresApiKey);
+            Assert.Equal(40, factory.OrderWeight);
+            Assert.True(factory.VisibleInMenu);
+            Assert.Equal("https://opencode.ai/zen/go/v1", factory.DefaultEndpoint);
+            Assert.Equal("deepseek-v4.1-flash", factory.DefaultModelName);
+            Assert.False(string.IsNullOrEmpty(factory.DisplayLabel));
+
+            // Test unconfigured settings
+            var emptySettings = new CoreSettingsStub { ApiKey = "", ApiEndpoint = "", ModelName = "" };
+            var unconfiguredClient = factory.Create(emptySettings);
+            Assert.NotNull(unconfiguredClient);
+            Assert.False(unconfiguredClient.IsConfigured());
+
+            // Test configured settings
+            var configuredSettings = new CoreSettingsStub { ApiKey = "oc_sk_valid_key", ApiEndpoint = "https://opencode.ai/zen/go/v1", ModelName = "deepseek-v4.1-flash" };
+            var configuredClient = factory.Create(configuredSettings);
+            Assert.NotNull(configuredClient);
+            Assert.True(configuredClient.IsConfigured());
+        }
+
+        private sealed class CoreSettingsStub : RimMind.Application.Common.Interfaces.Internal.ISettingsProvider
+        {
+            public string ApiKey { get; set; } = "";
+            public string ApiEndpoint { get; set; } = "";
+            public string ModelName { get; set; } = "";
+            public string Provider { get; set; } = "opencode";
+            public bool ForceJsonMode { get; set; } = true;
+            public int MaxTokens { get; set; } = 800;
+            public float DefaultTemperature { get; set; } = 0.7f;
+            public bool DebugLogging { get; set; } = false;
+            public int MaxConcurrentRequests { get; set; } = 2;
+            public int MaxRetryCount { get; set; } = 2;
+            public int RequestTimeoutMs { get; set; } = 30000;
+            public int RequestExpireTicks { get; set; } = 600;
+            public int BehaviorHistoryMax { get; set; } = 10;
+            public int QueueProcessInterval { get; set; } = 10;
+            public int DefaultModCooldownTicks { get; set; } = 600;
+            public bool IsConfigured => !string.IsNullOrEmpty(ApiKey);
+            public bool IsOpenAIConfigured() => !string.IsNullOrEmpty(ApiKey);
+            public void Persist() { }
+
+            public int AgentTickInterval => 600;
+            public int ThinkCooldownTicks => 300;
+            public int MaxToolCallDepth => 3;
+            public string Player2RemoteUrl { get; set; } = "";
+            public int CircuitBreakerFailureThreshold => 5;
+            public int CircuitBreakerOpenDurationSec => 60;
+            public int ContextCalibrateInterval { get; set; } = 1200;
+            public int ContextDiffLifetimeTicks { get; set; } = 600;
+            public bool RequestOverlayEnabled { get; set; } = true;
+            public float RequestOverlayX { get; set; } = 20f;
+            public float RequestOverlayY { get; set; } = 20f;
+            public float RequestOverlayW { get; set; } = 300f;
+            public float RequestOverlayH { get; set; } = 200f;
+            public bool ShowAgentProgressFloat { get; set; } = false;
+            public bool RequestOverlayAutoHideWhenEmpty { get; set; } = true;
+            public bool EnableFloatingMentalMonitor { get; set; } = false;
+            public string CustomPawnPrompt { get; set; } = "";
+            public string CustomMapPrompt { get; set; } = "";
+            public RimMind.Domain.Enums.FlywheelAutoApplyMode AutoApplyMode { get; set; } = RimMind.Domain.Enums.FlywheelAutoApplyMode.Off;
+            public float AutoApplyConfidenceThreshold { get; set; } = 0.8f;
+            public RimMind.Domain.Enums.AgentAutonomyLevel AutonomyLevel { get; set; } = RimMind.Domain.Enums.AgentAutonomyLevel.Autonomous;
+            public bool ShouldApproveAction(RimMind.Domain.Enums.RiskLevel risk) => true;
+
+            public RimMind.Application.Common.Interfaces.Internal.IContextSettings Context => this;
+            public float ContextBudget { get; set; } = 1000f;
+            public int ContextBriefLimit => 200;
+            public int EnvironmentScanRadius => 15;
+            public int EnvironmentMaxItems => 10;
+            public float ThreatThresholdHigh => 0.8f;
+            public float ThreatThresholdMedium => 0.5f;
+            public float ThreatThresholdLow => 0.2f;
+            public int MaxCacheEntries => 100;
+            public float MoodDiffThreshold => 0.1f;
+            public float TemperatureDiffThreshold => 5f;
+            public bool IncludeRace { get; set; } = true;
+            public bool IncludeAge { get; set; } = true;
+            public bool IncludeGender { get; set; } = true;
+            public bool IncludeBackstory { get; set; } = true;
+            public bool IncludeIdeology { get; set; } = false;
+            public bool IncludeTraits { get; set; } = true;
+            public bool IncludeSkills { get; set; } = true;
+            public int MinSkillLevel { get; set; } = 0;
+            public bool IncludeHealth { get; set; } = true;
+            public bool IncludeCapacities { get; set; } = true;
+            public bool IncludeMood { get; set; } = true;
+            public bool IncludeMoodThoughts { get; set; } = false;
+            public bool IncludeCurrentJob { get; set; } = true;
+            public bool IncludeWorkPriorities { get; set; } = true;
+            public bool IncludeEquipment { get; set; } = true;
+            public bool IncludeInventory { get; set; } = false;
+            public bool IncludeLocation { get; set; } = false;
+            public bool IncludeRelations { get; set; } = true;
+            public bool IncludeGenes { get; set; } = true;
+            public bool IncludeSurroundings { get; set; } = false;
+            public bool IncludeCombatStatus { get; set; } = true;
+            public bool IncludeGameTime { get; set; } = true;
+            public bool IncludeColonistCount { get; set; } = true;
+            public bool IncludeColonistNames { get; set; } = true;
+            public bool IncludeWealth { get; set; } = false;
+            public bool IncludeFood { get; set; } = true;
+            public bool IncludeSeason { get; set; } = true;
+            public bool IncludeWeather { get; set; } = true;
+            public bool IncludeThreats { get; set; } = true;
+
+            public void ApplyPreset(RimMind.Domain.Enums.ContextPreset preset) { }
+            public void ResetToDefault() { }
+        }
     }
 }

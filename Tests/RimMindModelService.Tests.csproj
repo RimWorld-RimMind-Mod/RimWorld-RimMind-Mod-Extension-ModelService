@@ -36,6 +36,8 @@
     <Compile Include="../Source/Protocol/OpenAIProtocolAdapter.cs" />
     <Compile Include="../Source/Protocol/AnthropicProtocolAdapter.cs" />
     <Compile Include="../Source/Client/ModelServiceClient.cs" />
+    <Compile Include="../Source/Client/ModelServiceClientFactory.cs" />
+    <Compile Include="../Source/Client/OpenCodeGoClientFactory.cs" />
     <Compile Include="../Source/Diagnostics/EndpointHealthProbe.cs" />
   </ItemGroup>
 

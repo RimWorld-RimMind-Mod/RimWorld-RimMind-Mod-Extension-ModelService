@@ -48,6 +48,8 @@
   <RimMind.ModelService.Provider.AnthropicClaude>Anthropic Claude 原生</RimMind.ModelService.Provider.AnthropicClaude>
   <RimMind.ModelService.Provider.LocalSubscriptionGateway>本地网关 (sub2api)</RimMind.ModelService.Provider.LocalSubscriptionGateway>
   <RimMind.ModelService.Provider.OpenCodeGo>OpenCode Go 订阅直连</RimMind.ModelService.Provider.OpenCodeGo>
+  <RimMind.ModelService.Provider.OpenCodeGo>OpenCode Go (订阅直连)</RimMind.ModelService.Provider.OpenCodeGo>
+  <RimMind.ModelService.Provider.ExtendedService>扩展模型服务 (多节点容灾/负载均衡)</RimMind.ModelService.Provider.ExtendedService>
 
   <!-- Security & Validation Messages -->
   <RimMind.ModelService.Security.LoopbackLocked>🛡️ 本地回环安全锁定</RimMind.ModelService.Security.LoopbackLocked>

@@ -35,4 +35,17 @@ namespace Verse
             // Stub for test execution
         }
     }
+
+    public static class Translator
+    {
+        public static string Translate(string key) => key;
+    }
+}
+
+namespace RimMind.ModelService
+{
+    public static class RimMindModelServiceMod
+    {
+        public static Settings.ModelServiceSettings? Settings { get; set; }
+    }
 }

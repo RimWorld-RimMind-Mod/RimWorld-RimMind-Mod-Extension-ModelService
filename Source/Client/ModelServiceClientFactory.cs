@@ -16,6 +16,12 @@ namespace RimMind.ModelService.Client
         public string ProviderId => ModelServiceProviderId;
         public bool RequiresApiKey => false;
 
+        public string DisplayLabel => global::Verse.Translator.Translate("RimMind.ModelService.Provider.ExtendedService");
+        public string? DefaultEndpoint => null;
+        public string? DefaultModelName => null;
+        public int OrderWeight => 50;
+        public bool VisibleInMenu => true;
+
         public IAIClient Create(ISettingsProvider settings)
         {
             var msSettings = RimMindModelServiceMod.Settings;

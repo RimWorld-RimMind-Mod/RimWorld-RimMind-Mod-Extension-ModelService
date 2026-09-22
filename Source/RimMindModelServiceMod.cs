@@ -39,8 +39,10 @@ namespace RimMind.ModelService
                 var factoryRegistry = RimMindAPI.Ext.Get<IAIClientFactory>();
                 if (factoryRegistry != null)
                 {
+                    factoryRegistry.Register(new OpenCodeGoClientFactory());
                     factoryRegistry.Register(new ModelServiceClientFactory());
                     Log.Message("[RimMind-ModelService] Extended model service provider registered successfully (extended_service).");
+                    Log.Message("[RimMind-ModelService] Extended model service providers registered successfully (opencode, extended_service).");
                 }
 
                 var settingsTabRegistry = RimMindAPI.Ext.Get<ISettingsTab>();

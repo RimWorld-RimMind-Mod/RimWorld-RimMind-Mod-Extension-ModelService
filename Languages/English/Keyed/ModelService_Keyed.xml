@@ -48,6 +48,8 @@
   <RimMind.ModelService.Provider.AnthropicClaude>Anthropic Claude Native</RimMind.ModelService.Provider.AnthropicClaude>
   <RimMind.ModelService.Provider.LocalSubscriptionGateway>Local Gateway (sub2api)</RimMind.ModelService.Provider.LocalSubscriptionGateway>
   <RimMind.ModelService.Provider.OpenCodeGo>OpenCode Go Direct</RimMind.ModelService.Provider.OpenCodeGo>
+  <RimMind.ModelService.Provider.OpenCodeGo>OpenCode Go (Subscription)</RimMind.ModelService.Provider.OpenCodeGo>
+  <RimMind.ModelService.Provider.ExtendedService>Extended Model Service (Multi-Node / Failover)</RimMind.ModelService.Provider.ExtendedService>
 
   <!-- Security & Validation Messages -->
   <RimMind.ModelService.Security.LoopbackLocked>🛡️ Local Loopback Secured</RimMind.ModelService.Security.LoopbackLocked>
