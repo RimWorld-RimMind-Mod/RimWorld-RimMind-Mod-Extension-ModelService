@@ -41,7 +41,6 @@ namespace RimMind.ModelService
                 {
                     factoryRegistry.Register(new OpenCodeGoClientFactory());
                     factoryRegistry.Register(new ModelServiceClientFactory());
-                    Log.Message("[RimMind-ModelService] Extended model service provider registered successfully (extended_service).");
                     Log.Message("[RimMind-ModelService] Extended model service providers registered successfully (opencode, extended_service).");
                 }
 
