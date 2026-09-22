@@ -7,14 +7,20 @@
 
   <RimMind.ModelService.Settings.BalancingStrategy>Load Balancing Strategy</RimMind.ModelService.Settings.BalancingStrategy>
   <RimMind.ModelService.Settings.BalancingStrategy.PriorityFailover>Priority Failover</RimMind.ModelService.Settings.BalancingStrategy.PriorityFailover>
+  <RimMind.ModelService.Settings.BalancingStrategy.PriorityFailover.Desc>Prefer higher priority healthy nodes; automatically fail over to backups on failure.</RimMind.ModelService.Settings.BalancingStrategy.PriorityFailover.Desc>
   <RimMind.ModelService.Settings.BalancingStrategy.RoundRobin>Round Robin</RimMind.ModelService.Settings.BalancingStrategy.RoundRobin>
+  <RimMind.ModelService.Settings.BalancingStrategy.RoundRobin.Desc>Distribute requests across all healthy nodes according to weights.</RimMind.ModelService.Settings.BalancingStrategy.RoundRobin.Desc>
 
   <RimMind.ModelService.Settings.EndpointsSection>Model Endpoint Pool</RimMind.ModelService.Settings.EndpointsSection>
   <RimMind.ModelService.Settings.AddCodexPreset>+ Codex Preset</RimMind.ModelService.Settings.AddCodexPreset>
+  <RimMind.ModelService.Settings.AddCodexPreset.Desc>Quickly add local Codex gateway endpoint preset.</RimMind.ModelService.Settings.AddCodexPreset.Desc>
   <RimMind.ModelService.Settings.AddOpenCodeGoPreset>+ OpenCode Go Preset</RimMind.ModelService.Settings.AddOpenCodeGoPreset>
+  <RimMind.ModelService.Settings.AddOpenCodeGoPreset.Desc>Quickly add OpenCode Go subscription endpoint preset.</RimMind.ModelService.Settings.AddOpenCodeGoPreset.Desc>
   <RimMind.ModelService.Settings.AddCustomEndpoint>+ Custom Node</RimMind.ModelService.Settings.AddCustomEndpoint>
+  <RimMind.ModelService.Settings.AddCustomEndpoint.Desc>Add a custom model service endpoint configuration.</RimMind.ModelService.Settings.AddCustomEndpoint.Desc>
   <RimMind.ModelService.Settings.RemoveEndpoint>Delete</RimMind.ModelService.Settings.RemoveEndpoint>
   <RimMind.ModelService.Settings.TestAllEndpoints>Test All</RimMind.ModelService.Settings.TestAllEndpoints>
+  <RimMind.ModelService.Settings.TestAllEndpoints.Desc>Concurrently ping and probe health for all enabled endpoints.</RimMind.ModelService.Settings.TestAllEndpoints.Desc>
   <RimMind.ModelService.Settings.NoEndpoints>Endpoint pool is empty. Click the buttons above to add presets or a custom node.</RimMind.ModelService.Settings.NoEndpoints>
 
   <!-- Endpoint Item Fields -->
@@ -22,10 +28,17 @@
   <RimMind.ModelService.Endpoint.BackupNode>#{0} Backup</RimMind.ModelService.Endpoint.BackupNode>
   <RimMind.ModelService.Endpoint.NameLabel>Name:</RimMind.ModelService.Endpoint.NameLabel>
   <RimMind.ModelService.Endpoint.ModelLabel>Model:</RimMind.ModelService.Endpoint.ModelLabel>
+  <RimMind.ModelService.Endpoint.Model.Desc>Model identifier passed when querying this endpoint (e.g. gpt-4o-mini or deepseek-chat).</RimMind.ModelService.Endpoint.Model.Desc>
+  <RimMind.ModelService.Endpoint.Url.Desc>Complete API base URL for this endpoint (e.g. http://127.0.0.1:8000/v1).</RimMind.ModelService.Endpoint.Url.Desc>
+  <RimMind.ModelService.Endpoint.ApiKey.Desc>API key or token for this endpoint. Leave empty if authentication is not required.</RimMind.ModelService.Endpoint.ApiKey.Desc>
   <RimMind.ModelService.Endpoint.Enabled>Enabled</RimMind.ModelService.Endpoint.Enabled>
+  <RimMind.ModelService.Endpoint.Enabled.Desc>Check to include this node in the routing pool; unchecked nodes are ignored.</RimMind.ModelService.Endpoint.Enabled.Desc>
   <RimMind.ModelService.Endpoint.TestPing>Ping Test</RimMind.ModelService.Endpoint.TestPing>
+  <RimMind.ModelService.Endpoint.TestPing.Desc>Send a lightweight test probe to verify network reachability and latency.</RimMind.ModelService.Endpoint.TestPing.Desc>
   <RimMind.ModelService.Endpoint.ShowKey>Show</RimMind.ModelService.Endpoint.ShowKey>
   <RimMind.ModelService.Endpoint.HideKey>Hide</RimMind.ModelService.Endpoint.HideKey>
+  <RimMind.ModelService.Endpoint.MoveUp>Move Up</RimMind.ModelService.Endpoint.MoveUp>
+  <RimMind.ModelService.Endpoint.MoveDown>Move Down</RimMind.ModelService.Endpoint.MoveDown>
   <RimMind.ModelService.Endpoint.StatusHealthy>Healthy</RimMind.ModelService.Endpoint.StatusHealthy>
   <RimMind.ModelService.Endpoint.StatusUnhealthy>Unhealthy</RimMind.ModelService.Endpoint.StatusUnhealthy>
   <RimMind.ModelService.Endpoint.StatusTesting>Probing...</RimMind.ModelService.Endpoint.StatusTesting>

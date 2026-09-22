@@ -5,6 +5,7 @@ using System.Threading.Tasks;
 using RimMind.ModelService.Diagnostics;
 using RimMind.ModelService.Models;
 using RimMind.ModelService.Security;
+using RimMind.Presentation.UI;
 using UnityEngine;
 using Verse;
 
@@ -21,30 +22,46 @@ namespace RimMind.ModelService.Settings
             var listing = new Listing_Standard();
             listing.Begin(inRect);
 
-            // 1. Enable Service Checkbox
+            // 1. Enable Service Section & Checkbox
+            SettingsUIDrawer.DrawSectionHeader(
+                listing,
+                "RimMind.ModelService.Settings.Category".Translate(),
+                "RimMind.ModelService.Settings.EnableService.Desc".Translate());
+
             listing.CheckboxLabeled(
                 "RimMind.ModelService.Settings.EnableService".Translate(),
                 ref settings.enableService,
                 "RimMind.ModelService.Settings.EnableService.Desc".Translate());
             listing.Gap(10f);
 
-            // 2. Balancing Strategy Radio Buttons
-            listing.Label("RimMind.ModelService.Settings.BalancingStrategy".Translate());
+            // 2. Balancing Strategy Section & Radio Buttons
+            SettingsUIDrawer.DrawSectionHeader(
+                listing,
+                "RimMind.ModelService.Settings.BalancingStrategy".Translate());
+
             bool isPriority = settings.balancingStrategy == BalancingStrategy.PriorityFailover;
-            if (listing.RadioButton("RimMind.ModelService.Settings.BalancingStrategy.PriorityFailover".Translate(), isPriority))
+            if (listing.RadioButton(
+                "RimMind.ModelService.Settings.BalancingStrategy.PriorityFailover".Translate(),
+                isPriority,
+                tooltip: "RimMind.ModelService.Settings.BalancingStrategy.PriorityFailover.Desc".Translate()))
             {
                 settings.balancingStrategy = BalancingStrategy.PriorityFailover;
             }
 
             bool isRoundRobin = settings.balancingStrategy == BalancingStrategy.RoundRobin;
-            if (listing.RadioButton("RimMind.ModelService.Settings.BalancingStrategy.RoundRobin".Translate(), isRoundRobin))
+            if (listing.RadioButton(
+                "RimMind.ModelService.Settings.BalancingStrategy.RoundRobin".Translate(),
+                isRoundRobin,
+                tooltip: "RimMind.ModelService.Settings.BalancingStrategy.RoundRobin.Desc".Translate()))
             {
                 settings.balancingStrategy = BalancingStrategy.RoundRobin;
             }
             listing.Gap(14f);
 
             // 3. Top Action Buttons Row
-            listing.Label("RimMind.ModelService.Settings.EndpointsSection".Translate());
+            SettingsUIDrawer.DrawSectionHeader(
+                listing,
+                "RimMind.ModelService.Settings.EndpointsSection".Translate());
             var buttonRow = listing.GetRect(30f);
             float curBtnX = buttonRow.x;
 
@@ -55,6 +72,7 @@ namespace RimMind.ModelService.Settings
                 var preset = ModelEndpointPresets.CreateCodexGatewayPreset(settings.endpoints.Count);
                 settings.endpoints.Add(preset);
             }
+            TooltipHandler.TipRegion(codexRect, "RimMind.ModelService.Settings.AddCodexPreset.Desc".Translate());
             curBtnX += 145f;
 
             // [+ OpenCode Go 预设] (160px)
@@ -64,6 +82,7 @@ namespace RimMind.ModelService.Settings
                 var preset = ModelEndpointPresets.CreateOpenCodeGoPreset(settings.endpoints.Count);
                 settings.endpoints.Add(preset);
             }
+            TooltipHandler.TipRegion(openCodeRect, "RimMind.ModelService.Settings.AddOpenCodeGoPreset.Desc".Translate());
             curBtnX += 165f;
 
             // [+ 自定义节点] (130px)
@@ -81,6 +100,7 @@ namespace RimMind.ModelService.Settings
                     isEnabled = true
                 });
             }
+            TooltipHandler.TipRegion(customRect, "RimMind.ModelService.Settings.AddCustomEndpoint.Desc".Translate());
             curBtnX += 135f;
 
             // [测试全部] (130px)
@@ -89,6 +109,7 @@ namespace RimMind.ModelService.Settings
             {
                 TriggerTestAllEndpoints(settings);
             }
+            TooltipHandler.TipRegion(testAllRect, "RimMind.ModelService.Settings.TestAllEndpoints.Desc".Translate());
 
             listing.Gap(10f);
 
@@ -131,17 +152,22 @@ namespace RimMind.ModelService.Settings
                 string priorityText = (i == 0)
                     ? "RimMind.ModelService.Endpoint.PrimaryNode".Translate(i + 1)
                     : "RimMind.ModelService.Endpoint.BackupNode".Translate(i + 1);
-                Widgets.Label(new Rect(leftX, row1Y + 2f, 85f, 24f), priorityText);
+                Rect priorityRect = new Rect(leftX, row1Y + 2f, 85f, 24f);
+                Widgets.Label(priorityRect, priorityText);
+                TooltipHandler.TipRegion(priorityRect, priorityText);
 
                 // Name label & field
                 float nameLabelX = leftX + 90f;
                 Widgets.Label(new Rect(nameLabelX, row1Y + 2f, 40f, 24f), "RimMind.ModelService.Endpoint.NameLabel".Translate());
                 var nameRect = new Rect(nameLabelX + 45f, row1Y, 160f, 24f);
                 endpoint.name = Widgets.TextField(nameRect, endpoint.name);
+                TooltipHandler.TipRegion(nameRect, "RimMind.ModelService.Endpoint.NameLabel".Translate());
 
                 // Enable checkbox
                 float chkX = nameLabelX + 215f;
-                Widgets.CheckboxLabeled(new Rect(chkX, row1Y, 80f, 24f), "RimMind.ModelService.Endpoint.Enabled".Translate(), ref endpoint.isEnabled);
+                Rect chkRect = new Rect(chkX, row1Y, 80f, 24f);
+                Widgets.CheckboxLabeled(chkRect, "RimMind.ModelService.Endpoint.Enabled".Translate(), ref endpoint.isEnabled);
+                TooltipHandler.TipRegion(chkRect, "RimMind.ModelService.Endpoint.Enabled.Desc".Translate());
 
                 // Row 1 right-side buttons: Move Up, Move Down, Delete
                 var delRect = new Rect(rightXMax - 60f, row1Y, 60f, 24f);
@@ -149,6 +175,7 @@ namespace RimMind.ModelService.Settings
                 {
                     deleteIndex = i;
                 }
+                TooltipHandler.TipRegion(delRect, "RimMind.ModelService.Settings.RemoveEndpoint".Translate());
 
                 var downRect = new Rect(rightXMax - 96f, row1Y, 30f, 24f);
                 if (i < settings.endpoints.Count - 1)
@@ -157,6 +184,7 @@ namespace RimMind.ModelService.Settings
                     {
                         moveDownIndex = i;
                     }
+                    TooltipHandler.TipRegion(downRect, "RimMind.ModelService.Endpoint.MoveDown".Translate());
                 }
                 else
                 {
@@ -172,6 +200,7 @@ namespace RimMind.ModelService.Settings
                     {
                         moveUpIndex = i;
                     }
+                    TooltipHandler.TipRegion(upRect, "RimMind.ModelService.Endpoint.MoveUp".Translate());
                 }
                 else
                 {
@@ -204,11 +233,13 @@ namespace RimMind.ModelService.Settings
                     };
                     Find.WindowStack.Add(new FloatMenu(options));
                 }
+                TooltipHandler.TipRegion(provRect, providerLabel);
 
                 float urlLabelX = leftX + 220f;
                 Widgets.Label(new Rect(urlLabelX, row2Y + 2f, 38f, 24f), "URL:");
                 var urlFieldRect = new Rect(urlLabelX + 42f, row2Y, rightXMax - (urlLabelX + 42f), 24f);
                 endpoint.endpoint = Widgets.TextField(urlFieldRect, endpoint.endpoint);
+                TooltipHandler.TipRegion(urlFieldRect, "RimMind.ModelService.Endpoint.Url.Desc".Translate());
 
                 // --- Row 3: Model text field, API Key text field with Show/Hide toggle ---
                 float row3Y = cardRect.y + 76f;
@@ -216,6 +247,7 @@ namespace RimMind.ModelService.Settings
                 Widgets.Label(new Rect(leftX, row3Y + 2f, 50f, 24f), "RimMind.ModelService.Endpoint.ModelLabel".Translate());
                 var modelFieldRect = new Rect(leftX + 55f, row3Y, 170f, 24f);
                 endpoint.modelName = Widgets.TextField(modelFieldRect, endpoint.modelName);
+                TooltipHandler.TipRegion(modelFieldRect, "RimMind.ModelService.Endpoint.Model.Desc".Translate());
 
                 float keyLabelX = leftX + 235f;
                 Widgets.Label(new Rect(keyLabelX, row3Y + 2f, 65f, 24f), "API Key:");
@@ -238,6 +270,7 @@ namespace RimMind.ModelService.Settings
                         _revealedKeyNodeIds.Add(endpoint.id);
                     }
                 }
+                TooltipHandler.TipRegion(toggleBtnRect, toggleLabel);
 
                 var keyFieldRect = new Rect(keyLabelX + 70f, row3Y, toggleBtnRect.x - (keyLabelX + 75f), 24f);
                 if (isRevealed)
@@ -248,6 +281,7 @@ namespace RimMind.ModelService.Settings
                 {
                     endpoint.apiKey = GUI.PasswordField(keyFieldRect, endpoint.apiKey ?? "", '*');
                 }
+                TooltipHandler.TipRegion(keyFieldRect, "RimMind.ModelService.Endpoint.ApiKey.Desc".Translate());
 
                 // --- Row 4: Single-node [Ping 测试] button, Latency text + Status Indicator (🟢 / 🔴 / ⚪), Security Banner ---
                 float row4Y = cardRect.y + 110f;
@@ -278,6 +312,7 @@ namespace RimMind.ModelService.Settings
                         });
                     }
                 }
+                TooltipHandler.TipRegion(pingBtnRect, "RimMind.ModelService.Endpoint.TestPing.Desc".Translate());
 
                 float statusX = leftX + 100f;
                 string statusIcon;
@@ -301,6 +336,7 @@ namespace RimMind.ModelService.Settings
 
                 var statusRect = new Rect(statusX, row4Y + 2f, 155f, 24f);
                 Widgets.Label(statusRect, $"{statusIcon} {latencyStr} ({statusDetail})");
+                TooltipHandler.TipRegion(statusRect, $"{statusIcon} {latencyStr} ({statusDetail})");
 
                 // Security Banner (if LocalSubscriptionGateway: 🛡️ 本地回环安全锁定 if loopback, or ⚠️ 凭据安全拦截 if not loopback)
                 if (endpoint.providerType == ProviderType.LocalSubscriptionGateway)

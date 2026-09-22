@@ -7,14 +7,20 @@
 
   <RimMind.ModelService.Settings.BalancingStrategy>负载均衡与调度策略</RimMind.ModelService.Settings.BalancingStrategy>
   <RimMind.ModelService.Settings.BalancingStrategy.PriorityFailover>主备优先容灾 (Priority Failover)</RimMind.ModelService.Settings.BalancingStrategy.PriorityFailover>
+  <RimMind.ModelService.Settings.BalancingStrategy.PriorityFailover.Desc>优先使用序号靠前的健康主节点，主节点故障时自动切换至备用节点。</RimMind.ModelService.Settings.BalancingStrategy.PriorityFailover.Desc>
   <RimMind.ModelService.Settings.BalancingStrategy.RoundRobin>加权轮询分流 (Round Robin)</RimMind.ModelService.Settings.BalancingStrategy.RoundRobin>
+  <RimMind.ModelService.Settings.BalancingStrategy.RoundRobin.Desc>在所有健康节点间按权重轮流分发请求，实现负载均衡。</RimMind.ModelService.Settings.BalancingStrategy.RoundRobin.Desc>
 
   <RimMind.ModelService.Settings.EndpointsSection>模型端点节点配置池</RimMind.ModelService.Settings.EndpointsSection>
   <RimMind.ModelService.Settings.AddCodexPreset>+ Codex 预设</RimMind.ModelService.Settings.AddCodexPreset>
+  <RimMind.ModelService.Settings.AddCodexPreset.Desc>快速添加本地 Codex 代理网关端点配置预设。</RimMind.ModelService.Settings.AddCodexPreset.Desc>
   <RimMind.ModelService.Settings.AddOpenCodeGoPreset>+ OpenCode Go 预设</RimMind.ModelService.Settings.AddOpenCodeGoPreset>
+  <RimMind.ModelService.Settings.AddOpenCodeGoPreset.Desc>快速添加 OpenCode Go 订阅直连端点配置预设。</RimMind.ModelService.Settings.AddOpenCodeGoPreset.Desc>
   <RimMind.ModelService.Settings.AddCustomEndpoint>+ 自定义节点</RimMind.ModelService.Settings.AddCustomEndpoint>
+  <RimMind.ModelService.Settings.AddCustomEndpoint.Desc>添加一个自定义模型服务节点配置。</RimMind.ModelService.Settings.AddCustomEndpoint.Desc>
   <RimMind.ModelService.Settings.RemoveEndpoint>删除</RimMind.ModelService.Settings.RemoveEndpoint>
   <RimMind.ModelService.Settings.TestAllEndpoints>测试全部</RimMind.ModelService.Settings.TestAllEndpoints>
+  <RimMind.ModelService.Settings.TestAllEndpoints.Desc>对所有已启用的端点节点并发执行健康度与延迟测试。</RimMind.ModelService.Settings.TestAllEndpoints.Desc>
   <RimMind.ModelService.Settings.NoEndpoints>当前端点池为空，请点击上方按钮添加预设或自定义节点。</RimMind.ModelService.Settings.NoEndpoints>
 
   <!-- Endpoint Item Fields -->
@@ -22,10 +28,17 @@
   <RimMind.ModelService.Endpoint.BackupNode>#{0} 备用</RimMind.ModelService.Endpoint.BackupNode>
   <RimMind.ModelService.Endpoint.NameLabel>名称:</RimMind.ModelService.Endpoint.NameLabel>
   <RimMind.ModelService.Endpoint.ModelLabel>模型:</RimMind.ModelService.Endpoint.ModelLabel>
+  <RimMind.ModelService.Endpoint.Model.Desc>调用此端点时传递的模型名称（例如 gpt-4o-mini 或 deepseek-chat）。</RimMind.ModelService.Endpoint.Model.Desc>
+  <RimMind.ModelService.Endpoint.Url.Desc>模型服务的完整 API 请求 URL（例如 http://127.0.0.1:8000/v1）。</RimMind.ModelService.Endpoint.Url.Desc>
+  <RimMind.ModelService.Endpoint.ApiKey.Desc>端点的访问密钥或令牌。留空表示无需认证。</RimMind.ModelService.Endpoint.ApiKey.Desc>
   <RimMind.ModelService.Endpoint.Enabled>启用</RimMind.ModelService.Endpoint.Enabled>
+  <RimMind.ModelService.Endpoint.Enabled.Desc>勾选以启用此节点加入调度池；未勾选的节点将被忽略。</RimMind.ModelService.Endpoint.Enabled.Desc>
   <RimMind.ModelService.Endpoint.TestPing>Ping 测试</RimMind.ModelService.Endpoint.TestPing>
+  <RimMind.ModelService.Endpoint.TestPing.Desc>对该端点立即发送轻量级探测请求以测试网络延迟与可用性。</RimMind.ModelService.Endpoint.TestPing.Desc>
   <RimMind.ModelService.Endpoint.ShowKey>显示</RimMind.ModelService.Endpoint.ShowKey>
   <RimMind.ModelService.Endpoint.HideKey>隐藏</RimMind.ModelService.Endpoint.HideKey>
+  <RimMind.ModelService.Endpoint.MoveUp>上移节点优先级</RimMind.ModelService.Endpoint.MoveUp>
+  <RimMind.ModelService.Endpoint.MoveDown>下移节点优先级</RimMind.ModelService.Endpoint.MoveDown>
   <RimMind.ModelService.Endpoint.StatusHealthy>健康</RimMind.ModelService.Endpoint.StatusHealthy>
   <RimMind.ModelService.Endpoint.StatusUnhealthy>不可用</RimMind.ModelService.Endpoint.StatusUnhealthy>
   <RimMind.ModelService.Endpoint.StatusTesting>检测中...</RimMind.ModelService.Endpoint.StatusTesting>
