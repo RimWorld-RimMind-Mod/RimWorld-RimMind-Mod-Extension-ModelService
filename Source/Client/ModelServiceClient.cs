@@ -133,9 +133,11 @@ namespace RimMind.ModelService.Client
                     {
                         request.Headers.TryAddWithoutValidation("Authorization", "Bearer " + node.apiKey);
                     }
-                    string sessionGuid = string.IsNullOrEmpty(envelope.RequestId)
-                        ? Guid.NewGuid().ToString("N").Substring(0, 16)
-                        : envelope.RequestId;
+                    string sessionGuid = !string.IsNullOrEmpty(envelope.NpcId)
+                        ? envelope.NpcId!
+                        : (!string.IsNullOrEmpty(envelope.RequestId)
+                            ? envelope.RequestId!
+                            : Guid.NewGuid().ToString("N").Substring(0, 16));
                     request.Headers.TryAddWithoutValidation("x-opencode-session", "rimmind-" + sessionGuid);
                 }
                 else // OpenAICompatible or LocalSubscriptionGateway
@@ -150,7 +152,8 @@ namespace RimMind.ModelService.Client
                     }
                     if (!string.IsNullOrEmpty(requestUrl) && (requestUrl.IndexOf("opencode", StringComparison.OrdinalIgnoreCase) >= 0 || (!string.IsNullOrEmpty(node.apiKey) && node.apiKey.IndexOf("oc_sk_", StringComparison.OrdinalIgnoreCase) >= 0)))
                     {
-                        request.Headers.TryAddWithoutValidation("x-opencode-session", "rimmind-" + Guid.NewGuid().ToString("N").Substring(0, 12));
+                        string fallbackSession = !string.IsNullOrEmpty(envelope.NpcId) ? envelope.NpcId! : Guid.NewGuid().ToString("N").Substring(0, 12);
+                        request.Headers.TryAddWithoutValidation("x-opencode-session", "rimmind-" + fallbackSession);
                     }
                 }
 
