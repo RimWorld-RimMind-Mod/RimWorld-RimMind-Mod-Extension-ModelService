@@ -22,26 +22,37 @@ namespace RimMind.ModelService.Protocol
                 ["temperature"] = envelope.Temperature
             };
 
-            // 1. Anthropic separates system prompts into a top-level string (aggregate multiple if present)
-            var systemPrompts = envelope.Messages?
-                .Where(m => m.Role == "system" && !string.IsNullOrWhiteSpace(m.Content))
+            // 1. Anthropic separates system prompts into a top-level string.
+            // Extract only static system prompts (L0/L1) to keep the top-level system prompt 100% cache-stable!
+            var staticSystemPrompts = envelope.Messages?
+                .Where(m => m.Role == "system" && m.LayerTag != "L2" && m.LayerTag != "L3" && m.LayerTag != "L5" && !string.IsNullOrWhiteSpace(m.Content))
                 .Select(m => m.Content)
                 .ToList();
 
-            if (systemPrompts != null && systemPrompts.Count > 0)
+            if (staticSystemPrompts != null && staticSystemPrompts.Count > 0)
             {
-                root["system"] = string.Join("\n\n", systemPrompts);
+                root["system"] = string.Join("\n\n", staticSystemPrompts);
             }
+
+            // Extract volatile observations (L2/L3/L5) to append to the active user message
+            var volatileObservations = envelope.Messages?
+                .Where(m => m.Role == "system" && (m.LayerTag == "L2" || m.LayerTag == "L3" || m.LayerTag == "L5") && !string.IsNullOrWhiteSpace(m.Content))
+                .Select(m => m.Content)
+                .ToList();
+            string? observationPrefix = (volatileObservations != null && volatileObservations.Count > 0)
+                ? string.Join("\n\n", volatileObservations)
+                : null;
 
             // 2. Format messages
             var messagesArray = new JArray();
             if (envelope.Messages != null && envelope.Messages.Count > 0)
             {
-                JObject? lastUserMsg = null;
-                foreach (var msg in envelope.Messages)
-                {
-                    if (msg.Role == "system") continue; // Extracted to top-level
+                var nonSystemMessages = envelope.Messages.Where(m => m.Role != "system").ToList();
+                var lastUserMsgRef = nonSystemMessages.LastOrDefault(m => m.Role == "user");
 
+                JObject? lastUserMsg = null;
+                foreach (var msg in nonSystemMessages)
+                {
                     string role = msg.Role == "assistant" ? "assistant" : "user";
                     var contentArr = new JArray();
 
@@ -55,13 +66,22 @@ namespace RimMind.ModelService.Protocol
                             ["content"] = msg.Content ?? ""
                         });
                     }
-                    else if (!string.IsNullOrEmpty(msg.Content))
+                    else if (!string.IsNullOrEmpty(msg.Content) || (msg == lastUserMsgRef && !string.IsNullOrEmpty(observationPrefix)))
                     {
-                        contentArr.Add(new JObject
+                        string textContent = msg.Content ?? "";
+                        if (msg == lastUserMsgRef && !string.IsNullOrEmpty(observationPrefix))
                         {
-                            ["type"] = "text",
-                            ["text"] = msg.Content
-                        });
+                            textContent = $"<observation>\n{observationPrefix}\n</observation>\n\n{textContent}".TrimEnd();
+                        }
+
+                        if (!string.IsNullOrEmpty(textContent))
+                        {
+                            contentArr.Add(new JObject
+                            {
+                                ["type"] = "text",
+                                ["text"] = textContent
+                            });
+                        }
                     }
 
                     if (msg.ToolCalls != null && msg.ToolCalls.Count > 0)
@@ -122,12 +142,14 @@ namespace RimMind.ModelService.Protocol
 
             root["messages"] = messagesArray;
 
-            // 3. Format tools
+            // 3. Format tools with deterministic sorting and cache_control
             if (envelope.Tools != null && envelope.Tools.Count > 0)
             {
                 var toolsArray = new JArray();
-                foreach (var tool in envelope.Tools)
+                var sortedTools = envelope.Tools.OrderBy(t => t.Name, StringComparer.Ordinal).ToList();
+                for (int i = 0; i < sortedTools.Count; i++)
                 {
+                    var tool = sortedTools[i];
                     var toolObj = new JObject
                     {
                         ["name"] = tool.Name,
@@ -148,6 +170,12 @@ namespace RimMind.ModelService.Protocol
                     else
                     {
                         toolObj["input_schema"] = new JObject { ["type"] = "object" };
+                    }
+
+                    // Add ephemeral cache breakpoint to the last tool to cache all preceding tools and system prompt
+                    if (i == sortedTools.Count - 1)
+                    {
+                        toolObj["cache_control"] = new JObject { ["type"] = "ephemeral" };
                     }
 
                     toolsArray.Add(toolObj);

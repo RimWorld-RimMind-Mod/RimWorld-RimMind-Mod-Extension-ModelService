@@ -184,6 +184,76 @@ namespace RimMind.ModelService.Tests.Contracts
                     Assert.Contains("claude-3-5-sonnet-20241022", json);
                     Assert.Contains("Hello", json);
                 }),
+                ("volatile layers L2 and L3 are kept out of system prompt and prepended to user observation", () =>
+                {
+                    var envelope = new LlmRequestEnvelope
+                    {
+                        Messages = new List<ChatMessage>
+                        {
+                            new ChatMessage { Role = "system", Content = "Core system rules", LayerTag = "L0" },
+                            new ChatMessage { Role = "system", Content = "Pawn identity info", LayerTag = "L1" },
+                            new ChatMessage { Role = "system", Content = "Weather: Rain, Time: 14:00", LayerTag = "L2" },
+                            new ChatMessage { Role = "system", Content = "Mood: Poor, Health: Bruised", LayerTag = "L3" },
+                            new ChatMessage { Role = "user", Content = "What should I do?" }
+                        },
+                        Temperature = 0.5f,
+                        MaxTokens = 800
+                    };
+                    var node = new ModelEndpointConfig { modelName = "claude-3-5-sonnet-20241022" };
+
+                    string json = AnthropicProtocolAdapter.BuildRequestJson(envelope, node);
+                    var parsed = Newtonsoft.Json.Linq.JObject.Parse(json);
+
+                    // Top-level system must ONLY contain static L0/L1 to preserve KV-Cache!
+                    string systemStr = parsed["system"]?.ToString() ?? "";
+                    Assert.Contains("Core system rules", systemStr);
+                    Assert.Contains("Pawn identity info", systemStr);
+                    Assert.DoesNotContain("Weather: Rain", systemStr);
+                    Assert.DoesNotContain("Mood: Poor", systemStr);
+
+                    // Volatile observation must be prepended to the user message
+                    var msgs = parsed["messages"] as Newtonsoft.Json.Linq.JArray;
+                    Assert.NotNull(msgs);
+                    Assert.Single(msgs);
+                    string userText = msgs[0]?["content"]?[0]?["text"]?.ToString() ?? "";
+                    Assert.Contains("<observation>", userText);
+                    Assert.Contains("Weather: Rain", userText);
+                    Assert.Contains("Mood: Poor", userText);
+                    Assert.Contains("What should I do?", userText);
+                }),
+                ("tools are sorted deterministically and ephemeral cache_control is placed on the last tool", () =>
+                {
+                    var envelope = new LlmRequestEnvelope
+                    {
+                        Messages = new List<ChatMessage>
+                        {
+                            new ChatMessage { Role = "user", Content = "Inspect colonist." }
+                        },
+                        Tools = new List<StructuredTool>
+                        {
+                            new StructuredTool { Name = "z_heal_pawn", Description = "Heal" },
+                            new StructuredTool { Name = "a_draft_pawn", Description = "Draft" },
+                            new StructuredTool { Name = "m_move_pawn", Description = "Move" }
+                        }
+                    };
+                    var node = new ModelEndpointConfig { modelName = "claude-3-5-haiku-20241022" };
+
+                    string json = AnthropicProtocolAdapter.BuildRequestJson(envelope, node);
+                    var parsed = Newtonsoft.Json.Linq.JObject.Parse(json);
+                    var tools = parsed["tools"] as Newtonsoft.Json.Linq.JArray;
+
+                    Assert.NotNull(tools);
+                    Assert.Equal(3, tools.Count);
+                    Assert.Equal("a_draft_pawn", tools[0]?["name"]?.ToString());
+                    Assert.Equal("m_move_pawn", tools[1]?["name"]?.ToString());
+                    Assert.Equal("z_heal_pawn", tools[2]?["name"]?.ToString());
+
+                    // Ephemeral cache control on last tool
+                    Assert.Null(tools[0]?["cache_control"]);
+                    Assert.Null(tools[1]?["cache_control"]);
+                    Assert.NotNull(tools[2]?["cache_control"]);
+                    Assert.Equal("ephemeral", tools[2]?["cache_control"]?["type"]?.ToString());
+                }),
                 ("parse response handles text and tool_use blocks", () =>
                 {
                     string anthropicResponse = @"{

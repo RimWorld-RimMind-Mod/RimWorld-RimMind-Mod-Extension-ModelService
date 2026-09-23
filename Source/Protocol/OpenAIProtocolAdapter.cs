@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using RimMind.Domain.Common;
@@ -69,7 +70,7 @@ namespace RimMind.ModelService.Protocol
             if (envelope.Tools != null && envelope.Tools.Count > 0)
             {
                 var toolsArray = new JArray();
-                foreach (var tool in envelope.Tools)
+                foreach (var tool in envelope.Tools.OrderBy(t => t.Name, StringComparer.Ordinal))
                 {
                     var funcObj = new JObject
                     {
