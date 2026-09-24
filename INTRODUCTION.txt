@@ -1,0 +1,35 @@
+[h1]RimMind - Extension: ModelService (模型扩展服务)[/h1]
+
+[i]进阶模型接入与订阅代理网关——赋能 Anthropic 协议、OpenCode 订阅直连与多线路容灾。[/i]
+[i]Advanced LLM gateway & subscription routing — Anthropic protocols, OpenCode Go direct access, and failover load balancing.[/i]
+
+[hr]
+[h2]📖 中文介绍 / Chinese Overview[/h2]
+
+[b]RimMind-Extension-ModelService[/b] 是 RimMind 套件的官方高级模型扩展模组。对于追求极致模型能力、需要使用特定服务商（如 Anthropic Claude 提示缓存、OpenCode Go 专属订阅端点）或需要本地多网关轮询容灾的玩家，本模组提供了完善的客户端工厂与协议适配支持。
+
+[h3]🌟 核心特性[/h3]
+[list]
+[*] [b]OpenCode Go 订阅直连[/b]：开箱内置 OpenCode Go 高速端点预设，自动注入会话隔离与认证头。
+[*] [b]Anthropic 协议与 Ephemeral 缓存原生适配[/b]：完美适配 Claude Messages API，将易变环境剥离为 User 观察块，并在工具末尾注入 `cache_control: {"type": "ephemeral"}`，将 Claude 官方缓存命中率推至巅峰。
+[*] [b]多线路故障转移 (Failover)[/b]：支持备选端点配置，在主线路超时或遭遇速率限制（429）时优雅回退，保证殖民地运转不中断。
+[/list]
+
+[hr]
+[h2]🌐 English Overview[/h2]
+
+[b]RimMind-Extension-ModelService[/b] is the official model routing and gateway extension for the RimMind AI suite.
+
+[h3]🌟 Key Highlights[/h3]
+[list]
+[*] [b]OpenCode Go Direct Gateway[/b]: Dedicated provider preset with automatic session isolation headers.
+[*] [b]Anthropic Ephemeral Cache Optimization[/b]: Native protocol adaptation for Claude Messages API with precise cache_control markers.
+[*] [b]Failover & Resilience[/b]: Automatically switches to secondary endpoints when encountering network errors or HTTP 429 rate limits.
+[/list]
+
+[hr]
+[h2]⚙️ 依赖与顺序 / Requirements & Order[/h2]
+[list]
+[*] [b]必需前置 (Required)[/b]: Harmony, [b]RimMind-Core[/b]
+[/list]
+
