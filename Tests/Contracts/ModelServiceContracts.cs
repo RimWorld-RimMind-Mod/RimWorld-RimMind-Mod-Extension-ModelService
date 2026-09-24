@@ -603,6 +603,8 @@ namespace RimMind.ModelService.Tests.Contracts
             public int BehaviorHistoryMax { get; set; } = 10;
             public int QueueProcessInterval { get; set; } = 10;
             public int DefaultModCooldownTicks { get; set; } = 600;
+            public float ActivityFrequencyScale { get; set; } = 1.0f;
+            public bool AutoActivateColonistAgents { get; set; } = false;
             public bool IsConfigured => !string.IsNullOrEmpty(ApiKey);
             public bool IsOpenAIConfigured() => !string.IsNullOrEmpty(ApiKey);
             public void Persist() { }
