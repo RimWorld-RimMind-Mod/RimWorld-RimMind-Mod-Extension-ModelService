@@ -45,48 +45,7 @@
 | RimMind-Bridge-RimTalk | RimMind 与 RimTalk 模组的对话气泡与上下文桥 | Core, RimTalk | [链接](https://github.com/RimWorld-RimMind-Mod/RimWorld-RimMind-Mod-Bridge-RimTalk) |
 | **RimMind-Extension-ModelService** | **扩展模型网关、OpenCode Go 订阅直连与多端点负载均衡** | Core | [链接](https://github.com/RimWorld-RimMind-Mod/RimWorld-RimMind-Mod-Extension-ModelService) |
 
-## 🎮 实机特性展示 / In-Game Showcase
-
-![RimMind-Extension-ModelService In-Game Showcase](docs/images/showcase.jpg)
-
-- **OpenCode Go 订阅直连与负载均衡**：通过动态服务商注册工厂无缝扩展模型端点，支持多端点 Ping 测速、毫秒级主备故障转移与 60s 智能熔断。
-- **Anthropic 协议 Prompt Caching**：对 Claude Messages API 自动注入 `cache_control: {"type": "ephemeral"}` 并在尾部隔离易变观察，降低 Token 开销与延迟。
-
 ## 安装与依赖
 
 - 依赖 `RimMind-Core`（以及 `Lib.Harmony`）。
 - 在 RimWorld 模组加载顺序中置于 `RimMind-Core` 之后即可。
-
----
-
-# RimMind-Extension-ModelService (English)
-
-> Extended Model Service Provider & Local Subscription Gateway for RimMind
-
-Provides external model service integrations, dynamic provider registration, local subscription adapters, and high-availability load balancing for the RimMind mod suite.
-
-## 🎮 In-Game Showcase / Feature Demonstration
-
-![RimMind-Extension-ModelService In-Game Showcase](docs/images/showcase.jpg)
-
-- **OpenCode Go Subscription & High-Availability Load Balancing**: Connects seamlessly via dynamic factory registration, providing multi-endpoint RTT ping tests, millisecond failovers, and 60-second circuit breakers.
-- **Anthropic Claude Prompt Caching**: Integrates native Claude Messages protocol with ephemeral tool caching (`cache_control: {"type": "ephemeral"}`) and tail-end volatile isolation to minimize token spend and response latency.
-
-## Key Features
-
-1. **Multi-Protocol Adapters & Prompt Caching (KV-Cache)**:
-   - OpenAI compatible endpoint support (OpenAI, DeepSeek, Ollama, vLLM, LM Studio).
-   - Anthropic Claude protocol with prompt caching optimization.
-2. **OpenCode Go Subscription Direct Integration**:
-   - Built-in provider factory (`https://opencode.ai/zen/go/v1`) with session isolation.
-3. **Dynamic Decoupled Provider Injection**:
-   - Zero-dependency runtime registration via `RimMindAPI.Ext.RegisterClientFactory(...)`.
-4. **Local Subscription Gateway (Codex / Sub2API)**:
-   - Strict loopback isolation (`127.0.0.1`, `localhost`, `::1`) protecting credentials.
-5. **High-Availability Load Balancing**:
-   - Priority failover, round-robin, and automated circuit breaking.
-
-## Installation
-
-- Depends on `RimMind-Core` (and `Lib.Harmony`).
-- Place after `RimMind-Core` in the RimWorld mod load order.
