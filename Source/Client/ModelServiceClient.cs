@@ -166,8 +166,12 @@ namespace RimMind.ModelService.Client
 
                 if (!response.IsSuccessStatusCode)
                 {
+                    int statusCode = (int)response.StatusCode;
+                    string errMsg = $"Node '{node.name}' HTTP {statusCode}: {responseBody}";
                     return Result<LlmResponse, RimMindError>.Err(
-                        RimMindErrors.ClientPermanent($"Node '{node.name}' HTTP {(int)response.StatusCode}: {responseBody}"));
+                        (statusCode == 429 || statusCode >= 500 || statusCode == 408)
+                            ? RimMindErrors.ClientTransient(errMsg)
+                            : RimMindErrors.ClientPermanent(errMsg));
                 }
 
                 Result<LlmResponse, RimMindError> parseResult;

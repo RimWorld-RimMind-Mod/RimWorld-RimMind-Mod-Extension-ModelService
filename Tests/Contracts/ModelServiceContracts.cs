@@ -613,6 +613,7 @@ namespace RimMind.ModelService.Tests.Contracts
             public int ThinkCooldownTicks => 300;
             public int MaxToolCallDepth => 3;
             public string Player2RemoteUrl { get; set; } = "";
+            public System.Collections.Generic.IReadOnlyList<RimMind.Application.Common.Models.Client.BackupEndpointNode>? BackupEndpoints => null;
             public int CircuitBreakerFailureThreshold => 5;
             public int CircuitBreakerOpenDurationSec => 60;
             public int ContextCalibrateInterval { get; set; } = 1200;

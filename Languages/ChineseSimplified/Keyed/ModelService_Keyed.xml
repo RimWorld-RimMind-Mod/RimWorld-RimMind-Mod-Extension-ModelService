@@ -47,7 +47,6 @@
   <RimMind.ModelService.Provider.OpenAICompatible>OpenAI 兼容协议</RimMind.ModelService.Provider.OpenAICompatible>
   <RimMind.ModelService.Provider.AnthropicClaude>Anthropic Claude 原生</RimMind.ModelService.Provider.AnthropicClaude>
   <RimMind.ModelService.Provider.LocalSubscriptionGateway>本地网关 (sub2api)</RimMind.ModelService.Provider.LocalSubscriptionGateway>
-  <RimMind.ModelService.Provider.OpenCodeGo>OpenCode Go 订阅直连</RimMind.ModelService.Provider.OpenCodeGo>
   <RimMind.ModelService.Provider.OpenCodeGo>OpenCode Go (订阅直连)</RimMind.ModelService.Provider.OpenCodeGo>
   <RimMind.ModelService.Provider.ExtendedService>扩展模型服务 (多节点容灾/负载均衡)</RimMind.ModelService.Provider.ExtendedService>
 
@@ -58,4 +57,10 @@
   <RimMind.ModelService.Security.LoopbackViolation>安全拦截: 本地订阅代理协议仅允许绑定本地回环地址 (127.0.0.1 或 localhost)，已拒绝非本地外部地址以防凭据外泄。</RimMind.ModelService.Security.LoopbackViolation>
   <RimMind.ModelService.Security.OpenCodeGoSessionRouted>🌐 OpenCode Go 订阅直连</RimMind.ModelService.Security.OpenCodeGoSessionRouted>
   <RimMind.ModelService.Security.OpenCodeGoSessionRouted.Desc>自动挂载 x-opencode-session 会话路由请求头，原生适配 OpenCode Go 订阅网关。</RimMind.ModelService.Security.OpenCodeGoSessionRouted.Desc>
+
+  <!-- Debug Actions -->
+  <RimMind.ModelService.Debug.NoEndpoints>[ModelService] 未配置任何端点，请在设置中添加预设节点。</RimMind.ModelService.Debug.NoEndpoints>
+  <RimMind.ModelService.Debug.ProbingAll>[ModelService] 开始探测全部 {0} 个模型服务节点...</RimMind.ModelService.Debug.ProbingAll>
+  <RimMind.ModelService.Debug.ProbeSuccess>[ModelService] 🟢 {0} ({1}): 延迟 {2}ms (连接成功)</RimMind.ModelService.Debug.ProbeSuccess>
+  <RimMind.ModelService.Debug.ProbeFailed>[ModelService] 🔴 {0}: 失败 - {1}</RimMind.ModelService.Debug.ProbeFailed>
 </LanguageData>
