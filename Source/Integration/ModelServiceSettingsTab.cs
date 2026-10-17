@@ -9,7 +9,7 @@ namespace RimMind.ModelService.Integration
     {
         public string Id => "model_service";
         public string OwnerModId => "mcocdaa.RimMindModelService";
-        public string Label => "RimMind.ModelService.Settings.Category".Translate();
+        public string Label => "RimMind.ModelService.Settings.Category".CanTranslate() ? (string)"RimMind.ModelService.Settings.Category".Translate() : "Model Service";
 
         public void Draw(Rect rect)
         {
