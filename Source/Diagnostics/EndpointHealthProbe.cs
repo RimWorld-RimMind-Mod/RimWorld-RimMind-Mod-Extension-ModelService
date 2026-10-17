@@ -52,10 +52,11 @@ namespace RimMind.ModelService.Diagnostics
                         request.Headers.TryAddWithoutValidation("Authorization", "Bearer " + endpoint.apiKey);
                     }
                 }
-                if (!string.IsNullOrEmpty(endpoint.endpoint) && (endpoint.endpoint.IndexOf("opencode", StringComparison.OrdinalIgnoreCase) >= 0 || (!string.IsNullOrEmpty(endpoint.apiKey) && endpoint.apiKey.IndexOf("oc_sk_", StringComparison.OrdinalIgnoreCase) >= 0)))
-                if (endpoint.providerType == ProviderType.OpenCodeGo || (!string.IsNullOrEmpty(endpoint.endpoint) && (endpoint.endpoint.IndexOf("opencode", StringComparison.OrdinalIgnoreCase) >= 0 || (!string.IsNullOrEmpty(endpoint.apiKey) && endpoint.apiKey.IndexOf("oc_sk_", StringComparison.OrdinalIgnoreCase) >= 0))))
+                if (endpoint.providerType == ProviderType.OpenCodeGo
+                    || (!string.IsNullOrEmpty(endpoint.endpoint) && endpoint.endpoint.IndexOf("opencode", StringComparison.OrdinalIgnoreCase) >= 0)
+                    || (!string.IsNullOrEmpty(endpoint.apiKey) && endpoint.apiKey.StartsWith("oc_sk_", StringComparison.OrdinalIgnoreCase)))
                 {
-                    request.Headers.TryAddWithoutValidation("x-opencode-session", "rimmind-probe");
+                    request.Headers.TryAddWithoutValidation("x-opencode-session", "rimmind-health-probe");
                 }
 
                 using var response = await HttpClient.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, ct).ConfigureAwait(false);
@@ -66,11 +67,13 @@ namespace RimMind.ModelService.Diagnostics
                 if (response.IsSuccessStatusCode || (int)response.StatusCode == 401 || (int)response.StatusCode == 404)
                 {
                     endpoint.RecordSuccess(latency);
+                    endpoint.isHealthy = true;
                     return (true, latency, $"HTTP {(int)response.StatusCode} reachable");
                 }
                 else
                 {
                     endpoint.lastLatencyMs = latency;
+                    endpoint.isHealthy = false;
                     return (false, latency, $"HTTP {(int)response.StatusCode} {response.ReasonPhrase}");
                 }
             }
@@ -78,6 +81,7 @@ namespace RimMind.ModelService.Diagnostics
             {
                 stopwatch.Stop();
                 endpoint.lastLatencyMs = -1;
+                endpoint.isHealthy = false;
                 return (false, -1, ex.Message);
             }
         }

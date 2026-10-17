@@ -53,8 +53,7 @@ namespace RimMind.ModelService.Client
             var source = _endpointsProvider();
             if (source == null) return Array.Empty<ModelEndpointConfig>();
 
-            object sync = (source is System.Collections.ICollection col) ? col.SyncRoot : source;
-            lock (sync)
+            lock (source)
             {
                 try
                 {

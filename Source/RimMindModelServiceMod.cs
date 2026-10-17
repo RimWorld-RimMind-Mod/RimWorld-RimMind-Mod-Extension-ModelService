@@ -21,7 +21,9 @@ namespace RimMind.ModelService
         }
 
         public override string SettingsCategory() =>
-            "RimMind.ModelService.Settings.Category".Translate();
+            "RimMind.ModelService.Settings.Category".CanTranslate()
+                ? (string)"RimMind.ModelService.Settings.Category".Translate()
+                : "RimMind - Model Service";
 
         public override void DoSettingsWindowContents(Rect inRect)
         {

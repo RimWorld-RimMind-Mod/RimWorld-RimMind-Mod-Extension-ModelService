@@ -16,7 +16,9 @@ namespace RimMind.ModelService.Client
         public string ProviderId => ModelServiceProviderId;
         public bool RequiresApiKey => false;
 
-        public string DisplayLabel => global::Verse.Translator.Translate("RimMind.ModelService.Provider.ExtendedService");
+        public string DisplayLabel => global::Verse.Translator.CanTranslate("RimMind.ModelService.Provider.ExtendedService")
+            ? (string)global::Verse.Translator.Translate("RimMind.ModelService.Provider.ExtendedService")
+            : "Extended Model Service (Load Balanced)";
         public string? DefaultEndpoint => null;
         public string? DefaultModelName => null;
         public int OrderWeight => 50;
@@ -34,19 +36,24 @@ namespace RimMind.ModelService.Client
                     ?? Environment.GetEnvironmentVariable("RIMMIND_TEST_ENDPOINT");
                 string? backupModel = Environment.GetEnvironmentVariable("RIMMIND_BACKUP_MODEL")
                     ?? Environment.GetEnvironmentVariable("RIMMIND_TEST_MODEL");
-                foreach (var ep in msSettings.endpoints)
+                lock (msSettings.endpoints)
                 {
-                    if (string.IsNullOrEmpty(ep.apiKey) && ep.providerType == ProviderType.OpenCodeGo)
+                    foreach (var ep in msSettings.endpoints)
                     {
-                        ep.apiKey = effectiveOpenCodeKey!;
-                        if (!string.IsNullOrEmpty(backupEndpoint)) ep.endpoint = backupEndpoint!;
-                        if (!string.IsNullOrEmpty(backupModel)) ep.modelName = backupModel!;
+                        if (string.IsNullOrEmpty(ep.apiKey) && ep.providerType == ProviderType.OpenCodeGo)
+                        {
+                            ep.apiKey = effectiveOpenCodeKey!;
+                            if (!string.IsNullOrEmpty(backupEndpoint)) ep.endpoint = backupEndpoint!;
+                            if (!string.IsNullOrEmpty(backupModel)) ep.modelName = backupModel!;
+                        }
                     }
                 }
             }
 
             return new ModelServiceClient(
-                () => msSettings?.endpoints ?? (IReadOnlyList<ModelEndpointConfig>)Array.Empty<ModelEndpointConfig>(),
+                () => (msSettings != null && msSettings.enableService && msSettings.endpoints != null)
+                    ? msSettings.endpoints
+                    : (IReadOnlyList<ModelEndpointConfig>)Array.Empty<ModelEndpointConfig>(),
                 () => msSettings?.balancingStrategy ?? BalancingStrategy.PriorityFailover);
         }
     }

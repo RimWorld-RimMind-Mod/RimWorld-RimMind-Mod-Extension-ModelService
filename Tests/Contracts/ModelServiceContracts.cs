@@ -667,6 +667,135 @@ namespace RimMind.ModelService.Tests.Contracts
             Assert.True(configuredClient.IsConfigured());
         }
 
+        [Fact]
+        public async Task ModelServiceClientFactory_honors_enableService_and_synchronizes_on_list_instance()
+        {
+            var prevSettings = RimMindModelServiceMod.Settings;
+            try
+            {
+                var msSettings = new ModelServiceSettings
+                {
+                    enableService = true,
+                    endpoints = new List<ModelEndpointConfig>
+                    {
+                        new ModelEndpointConfig
+                        {
+                            id = "ep-1",
+                            name = "Primary",
+                            endpoint = "http://127.0.0.1:8000/v1",
+                            isEnabled = true
+                        }
+                    }
+                };
+                RimMindModelServiceMod.Settings = msSettings;
+
+                var factory = new ModelServiceClientFactory();
+                var client = factory.Create(new CoreSettingsStub());
+
+                Assert.True(client.IsConfigured());
+
+                // Verify GetEndpointsSafe locks on the exact list reference (msSettings.endpoints)
+                bool readCompleted = false;
+                Task? readTask = null;
+                lock (msSettings.endpoints)
+                {
+                    readTask = Task.Run(() =>
+                    {
+                        _ = client.IsConfigured();
+                        System.Threading.Volatile.Write(ref readCompleted, true);
+                    });
+                    System.Threading.Thread.Sleep(30);
+                    Assert.False(System.Threading.Volatile.Read(ref readCompleted));
+                }
+                await readTask!;
+                Assert.True(System.Threading.Volatile.Read(ref readCompleted));
+
+                // When enableService is false, client must report not configured and reject requests
+                msSettings.enableService = false;
+                Assert.False(client.IsConfigured());
+
+                var res = await client.SendAsync(new LlmRequestEnvelope { RequestId = "req-disabled" });
+                Assert.True(res.IsErr);
+                Assert.Equal(RimMindErrorCode.ClientNotConfigured, res.Error.Code);
+            }
+            finally
+            {
+                RimMindModelServiceMod.Settings = prevSettings;
+            }
+        }
+
+        [Fact]
+        public async Task EndpointHealthProbe_marks_endpoint_unhealthy_on_5xx_and_network_exception()
+        {
+            await ContractCaseRunner.RunAsync(
+                ("connection refusal or exception sets isHealthy to false and lastLatencyMs to -1", async () =>
+                {
+                    var ep = new ModelEndpointConfig
+                    {
+                        id = "unreachable-node",
+                        name = "Unreachable",
+                        endpoint = "http://127.0.0.1:1/v1",
+                        providerType = ProviderType.OpenAICompatible,
+                        isHealthy = true,
+                        lastLatencyMs = 42
+                    };
+
+                    var (success, latency, _) = await RimMind.ModelService.Diagnostics.EndpointHealthProbe.ProbeEndpointAsync(ep);
+                    Assert.False(success);
+                    Assert.Equal(-1, latency);
+                    Assert.Equal(-1, ep.lastLatencyMs);
+                    Assert.False(ep.isHealthy);
+                }),
+                ("HTTP 503 response marks endpoint unhealthy while recording latency", async () =>
+                {
+                    var listener = new System.Net.Sockets.TcpListener(System.Net.IPAddress.Loopback, 0);
+                    listener.Start();
+                    int port = ((System.Net.IPEndPoint)listener.LocalEndpoint).Port;
+
+                    var serverTask = Task.Run(async () =>
+                    {
+                        using var tcpClient = await listener.AcceptTcpClientAsync();
+                        using var stream = tcpClient.GetStream();
+                        var buffer = new byte[1024];
+                        _ = await stream.ReadAsync(buffer, 0, buffer.Length);
+                        string reqText = System.Text.Encoding.ASCII.GetString(buffer);
+                        byte[] respBytes = System.Text.Encoding.ASCII.GetBytes(
+                            "HTTP/1.1 503 Service Unavailable\r\nContent-Length: 0\r\nConnection: close\r\n\r\n");
+                        await stream.WriteAsync(respBytes, 0, respBytes.Length);
+                        await stream.FlushAsync();
+                        return reqText;
+                    });
+
+                    try
+                    {
+                        var ep = new ModelEndpointConfig
+                        {
+                            id = "opencode-custom-url",
+                            name = "OpenCode Custom URL",
+                            endpoint = $"http://127.0.0.1:{port}/v1",
+                            providerType = ProviderType.OpenCodeGo,
+                            apiKey = "custom_key_without_oc_sk_prefix",
+                            isHealthy = true
+                        };
+
+                        var (success, latency, msg) = await RimMind.ModelService.Diagnostics.EndpointHealthProbe.ProbeEndpointAsync(ep);
+                        string receivedRequest = await serverTask;
+
+                        Assert.False(success);
+                        Assert.False(ep.isHealthy);
+                        Assert.True(latency >= 0);
+                        Assert.Equal(latency, ep.lastLatencyMs);
+                        Assert.Contains("503", msg);
+                        // Verify OpenCodeGo with custom URL and non-oc_sk_ key still receives x-opencode-session header
+                        Assert.Contains("x-opencode-session: rimmind-health-probe", receivedRequest, StringComparison.OrdinalIgnoreCase);
+                    }
+                    finally
+                    {
+                        listener.Stop();
+                    }
+                }));
+        }
+
         private sealed class CoreSettingsStub : RimMind.Application.Common.Interfaces.Internal.ISettingsProvider
         {
             public string ApiKey { get; set; } = "";
