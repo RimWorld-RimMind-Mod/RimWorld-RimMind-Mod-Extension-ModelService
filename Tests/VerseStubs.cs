@@ -38,7 +38,8 @@ namespace Verse
 
     public static class Translator
     {
-        public static string Translate(string key) => key;
+        public static bool CanTranslate(this string key) => true;
+        public static string Translate(this string key) => key;
     }
 }
 

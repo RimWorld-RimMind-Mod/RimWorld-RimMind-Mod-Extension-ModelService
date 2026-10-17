@@ -15,7 +15,9 @@ namespace RimMind.ModelService.Client
         public string ProviderId => OpenCodeProviderId;
         public bool RequiresApiKey => true;
 
-        public string DisplayLabel => global::Verse.Translator.Translate("RimMind.ModelService.Provider.OpenCodeGo");
+        public string DisplayLabel => global::Verse.Translator.CanTranslate("RimMind.ModelService.Provider.OpenCodeGo")
+            ? (string)global::Verse.Translator.Translate("RimMind.ModelService.Provider.OpenCodeGo")
+            : "OpenCode Go";
         public string? DefaultEndpoint => "https://opencode.ai/zen/go/v1";
         public string? DefaultModelName => "deepseek-v4.1-flash";
         public int OrderWeight => 40;
