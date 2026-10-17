@@ -20,11 +20,11 @@ namespace RimMind.ModelService.Debug
             var settings = RimMindModelServiceMod.Settings;
             if (settings == null || settings.endpoints.Count == 0)
             {
-                Messages.Message("[ModelService] 未配置任何端点，请在设置中添加预设节点。", MessageTypeDefOf.NeutralEvent, false);
+                Messages.Message("RimMind.ModelService.Debug.NoEndpoints".Translate(), MessageTypeDefOf.NeutralEvent, false);
                 return;
             }
 
-            Messages.Message($"[ModelService] 开始探测全部 {settings.endpoints.Count} 个模型服务节点...", MessageTypeDefOf.NeutralEvent, false);
+            Messages.Message("RimMind.ModelService.Debug.ProbingAll".Translate(settings.endpoints.Count), MessageTypeDefOf.NeutralEvent, false);
 
             foreach (var node in settings.endpoints)
             {
@@ -37,11 +37,11 @@ namespace RimMind.ModelService.Debug
                     {
                         if (isOk)
                         {
-                            Messages.Message($"[ModelService] 🟢 {targetNode.name} ({targetNode.modelName}): 延迟 {rttMs}ms (连接成功)", MessageTypeDefOf.PositiveEvent, false);
+                            Messages.Message("RimMind.ModelService.Debug.ProbeSuccess".Translate(targetNode.name, targetNode.modelName, rttMs), MessageTypeDefOf.PositiveEvent, false);
                         }
                         else
                         {
-                            Messages.Message($"[ModelService] 🔴 {targetNode.name}: 失败 - {error}", MessageTypeDefOf.NegativeEvent, false);
+                            Messages.Message("RimMind.ModelService.Debug.ProbeFailed".Translate(targetNode.name, error), MessageTypeDefOf.NegativeEvent, false);
                         }
                     });
                 });

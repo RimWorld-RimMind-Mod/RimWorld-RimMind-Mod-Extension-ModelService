@@ -47,7 +47,6 @@
   <RimMind.ModelService.Provider.OpenAICompatible>OpenAI Compatible</RimMind.ModelService.Provider.OpenAICompatible>
   <RimMind.ModelService.Provider.AnthropicClaude>Anthropic Claude Native</RimMind.ModelService.Provider.AnthropicClaude>
   <RimMind.ModelService.Provider.LocalSubscriptionGateway>Local Gateway (sub2api)</RimMind.ModelService.Provider.LocalSubscriptionGateway>
-  <RimMind.ModelService.Provider.OpenCodeGo>OpenCode Go Direct</RimMind.ModelService.Provider.OpenCodeGo>
   <RimMind.ModelService.Provider.OpenCodeGo>OpenCode Go (Subscription)</RimMind.ModelService.Provider.OpenCodeGo>
   <RimMind.ModelService.Provider.ExtendedService>Extended Model Service (Multi-Node / Failover)</RimMind.ModelService.Provider.ExtendedService>
 
@@ -58,4 +57,10 @@
   <RimMind.ModelService.Security.LoopbackViolation>Security Warning: Subscription proxy provider must bind to loopback address (127.0.0.1 / localhost) to prevent credential leakage.</RimMind.ModelService.Security.LoopbackViolation>
   <RimMind.ModelService.Security.OpenCodeGoSessionRouted>🌐 OpenCode Go Direct</RimMind.ModelService.Security.OpenCodeGoSessionRouted>
   <RimMind.ModelService.Security.OpenCodeGoSessionRouted.Desc>Automatically mounts x-opencode-session header for native OpenCode Go subscription routing.</RimMind.ModelService.Security.OpenCodeGoSessionRouted.Desc>
+
+  <!-- Debug Actions -->
+  <RimMind.ModelService.Debug.NoEndpoints>[ModelService] No endpoints configured. Please add preset nodes in Mod Settings.</RimMind.ModelService.Debug.NoEndpoints>
+  <RimMind.ModelService.Debug.ProbingAll>[ModelService] Probing all {0} model service node(s)...</RimMind.ModelService.Debug.ProbingAll>
+  <RimMind.ModelService.Debug.ProbeSuccess>[ModelService] 🟢 {0} ({1}): latency {2}ms (Connected)</RimMind.ModelService.Debug.ProbeSuccess>
+  <RimMind.ModelService.Debug.ProbeFailed>[ModelService] 🔴 {0}: Failed - {1}</RimMind.ModelService.Debug.ProbeFailed>
 </LanguageData>

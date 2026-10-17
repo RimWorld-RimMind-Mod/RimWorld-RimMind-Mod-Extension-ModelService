@@ -26,17 +26,21 @@ namespace RimMind.ModelService.Client
         {
             var msSettings = RimMindModelServiceMod.Settings;
             string? testKey = Environment.GetEnvironmentVariable("RIMMIND_TEST_API_KEY");
-            if (!string.IsNullOrEmpty(testKey) && msSettings?.endpoints != null)
+            string? backupKey = Environment.GetEnvironmentVariable("RIMMIND_BACKUP_API_KEY");
+            string? effectiveOpenCodeKey = !string.IsNullOrWhiteSpace(backupKey) ? backupKey : testKey;
+            if (!string.IsNullOrEmpty(effectiveOpenCodeKey) && msSettings?.endpoints != null)
             {
-                string? testEndpoint = Environment.GetEnvironmentVariable("RIMMIND_TEST_ENDPOINT");
-                string? testModel = Environment.GetEnvironmentVariable("RIMMIND_TEST_MODEL");
+                string? backupEndpoint = Environment.GetEnvironmentVariable("RIMMIND_BACKUP_ENDPOINT")
+                    ?? Environment.GetEnvironmentVariable("RIMMIND_TEST_ENDPOINT");
+                string? backupModel = Environment.GetEnvironmentVariable("RIMMIND_BACKUP_MODEL")
+                    ?? Environment.GetEnvironmentVariable("RIMMIND_TEST_MODEL");
                 foreach (var ep in msSettings.endpoints)
                 {
                     if (string.IsNullOrEmpty(ep.apiKey) && ep.providerType == ProviderType.OpenCodeGo)
                     {
-                        ep.apiKey = testKey;
-                        if (!string.IsNullOrEmpty(testEndpoint)) ep.endpoint = testEndpoint;
-                        if (!string.IsNullOrEmpty(testModel)) ep.modelName = testModel;
+                        ep.apiKey = effectiveOpenCodeKey!;
+                        if (!string.IsNullOrEmpty(backupEndpoint)) ep.endpoint = backupEndpoint!;
+                        if (!string.IsNullOrEmpty(backupModel)) ep.modelName = backupModel!;
                     }
                 }
             }
