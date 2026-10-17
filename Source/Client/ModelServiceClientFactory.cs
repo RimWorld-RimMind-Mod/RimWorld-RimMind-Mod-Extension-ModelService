@@ -45,12 +45,9 @@ namespace RimMind.ModelService.Client
                 }
             }
 
-            IReadOnlyList<ModelEndpointConfig> endpoints = msSettings?.endpoints ?? (IReadOnlyList<ModelEndpointConfig>)Array.Empty<ModelEndpointConfig>();
-            BalancingStrategy strategy = msSettings?.balancingStrategy ?? BalancingStrategy.PriorityFailover;
-
             return new ModelServiceClient(
-                () => endpoints,
-                () => strategy);
+                () => msSettings?.endpoints ?? (IReadOnlyList<ModelEndpointConfig>)Array.Empty<ModelEndpointConfig>(),
+                () => msSettings?.balancingStrategy ?? BalancingStrategy.PriorityFailover);
         }
     }
 }

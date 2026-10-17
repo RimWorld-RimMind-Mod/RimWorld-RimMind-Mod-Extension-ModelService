@@ -44,13 +44,53 @@ namespace RimMind.ModelService.Client
         }
 
         public bool IsLocalEndpoint => false;
-        public bool IsConfigured() => _endpointsProvider().Any(e => e.isEnabled);
+        public bool IsConfigured() => GetEndpointsSafe().Any(e => e.isEnabled);
         public bool SupportsStreaming => false;
         public bool SupportsNpcServerState => false;
 
+        private ModelEndpointConfig[] GetEndpointsSafe()
+        {
+            var source = _endpointsProvider();
+            if (source == null) return Array.Empty<ModelEndpointConfig>();
+
+            object sync = (source is System.Collections.ICollection col) ? col.SyncRoot : source;
+            lock (sync)
+            {
+                try
+                {
+                    return source.ToArray();
+                }
+                catch (InvalidOperationException)
+                {
+                    var list = new List<ModelEndpointConfig>();
+                    for (int i = 0; i < source.Count; i++)
+                    {
+                        try
+                        {
+                            if (i < source.Count)
+                            {
+                                var item = source[i];
+                                if (item != null) list.Add(item);
+                            }
+                        }
+                        catch (ArgumentOutOfRangeException)
+                        {
+                            break;
+                        }
+                    }
+                    return list.ToArray();
+                }
+            }
+        }
+
         public async Task<Result<LlmResponse, RimMindError>> SendAsync(LlmRequestEnvelope envelope)
         {
-            var endpoints = _endpointsProvider()?.ToArray();
+            if (envelope.Ct.IsCancellationRequested)
+            {
+                return Result<LlmResponse, RimMindError>.Err(RimMindErrors.Cancelled());
+            }
+
+            var endpoints = GetEndpointsSafe();
             if (endpoints == null || endpoints.Length == 0)
             {
                 return Result<LlmResponse, RimMindError>.Err(
@@ -73,6 +113,11 @@ namespace RimMind.ModelService.Client
 
             for (int attempt = 0; attempt < maxAttempts; attempt++)
             {
+                if (envelope.Ct.IsCancellationRequested)
+                {
+                    return Result<LlmResponse, RimMindError>.Err(RimMindErrors.Cancelled());
+                }
+
                 var candidates = candidatePool.Where(e => !triedEndpoints.Contains(e.id)).ToList();
                 var node = _loadBalancer.SelectEndpoint(candidates, strategy, currentTick);
                 if (node == null) break;
@@ -95,8 +140,20 @@ namespace RimMind.ModelService.Client
                     return result;
                 }
 
+                if (envelope.Ct.IsCancellationRequested || result.Error.Code == RimMindErrorCode.Cancelled)
+                {
+                    return result.Error.Code == RimMindErrorCode.Cancelled
+                        ? result
+                        : Result<LlmResponse, RimMindError>.Err(RimMindErrors.Cancelled());
+                }
+
                 lastErrorMessage = result.Error.Message;
                 node.RecordFailure(currentTick);
+            }
+
+            if (envelope.Ct.IsCancellationRequested)
+            {
+                return Result<LlmResponse, RimMindError>.Err(RimMindErrors.Cancelled());
             }
 
             return Result<LlmResponse, RimMindError>.Err(
@@ -198,6 +255,10 @@ namespace RimMind.ModelService.Client
             catch (OperationCanceledException)
             {
                 stopwatch.Stop();
+                if (envelope.Ct.IsCancellationRequested)
+                {
+                    return Result<LlmResponse, RimMindError>.Err(RimMindErrors.Cancelled());
+                }
                 return Result<LlmResponse, RimMindError>.Err(
                     RimMindErrors.ClientTransient("Request was canceled."));
             }

@@ -69,8 +69,11 @@ namespace RimMind.ModelService.Settings
             var codexRect = new Rect(curBtnX, buttonRow.y, 140f, 30f);
             if (Widgets.ButtonText(codexRect, "RimMind.ModelService.Settings.AddCodexPreset".Translate()))
             {
-                var preset = ModelEndpointPresets.CreateCodexGatewayPreset(settings.endpoints.Count);
-                settings.endpoints.Add(preset);
+                lock (settings.endpoints)
+                {
+                    var preset = ModelEndpointPresets.CreateCodexGatewayPreset(settings.endpoints.Count);
+                    settings.endpoints.Add(preset);
+                }
             }
             TooltipHandler.TipRegion(codexRect, "RimMind.ModelService.Settings.AddCodexPreset.Desc".Translate());
             curBtnX += 145f;
@@ -79,8 +82,11 @@ namespace RimMind.ModelService.Settings
             var openCodeRect = new Rect(curBtnX, buttonRow.y, 160f, 30f);
             if (Widgets.ButtonText(openCodeRect, "RimMind.ModelService.Settings.AddOpenCodeGoPreset".Translate()))
             {
-                var preset = ModelEndpointPresets.CreateOpenCodeGoPreset(settings.endpoints.Count);
-                settings.endpoints.Add(preset);
+                lock (settings.endpoints)
+                {
+                    var preset = ModelEndpointPresets.CreateOpenCodeGoPreset(settings.endpoints.Count);
+                    settings.endpoints.Add(preset);
+                }
             }
             TooltipHandler.TipRegion(openCodeRect, "RimMind.ModelService.Settings.AddOpenCodeGoPreset.Desc".Translate());
             curBtnX += 165f;
@@ -89,16 +95,19 @@ namespace RimMind.ModelService.Settings
             var customRect = new Rect(curBtnX, buttonRow.y, 130f, 30f);
             if (Widgets.ButtonText(customRect, "RimMind.ModelService.Settings.AddCustomEndpoint".Translate()))
             {
-                settings.endpoints.Add(new ModelEndpointConfig
+                lock (settings.endpoints)
                 {
-                    name = $"Node {settings.endpoints.Count + 1}",
-                    endpoint = "http://127.0.0.1:8000/v1",
-                    modelName = "gpt-4o-mini",
-                    providerType = ProviderType.OpenAICompatible,
-                    priority = settings.endpoints.Count,
-                    weight = 1,
-                    isEnabled = true
-                });
+                    settings.endpoints.Add(new ModelEndpointConfig
+                    {
+                        name = $"Node {settings.endpoints.Count + 1}",
+                        endpoint = "http://127.0.0.1:8000/v1",
+                        modelName = "gpt-4o-mini",
+                        providerType = ProviderType.OpenAICompatible,
+                        priority = settings.endpoints.Count,
+                        weight = 1,
+                        isEnabled = true
+                    });
+                }
             }
             TooltipHandler.TipRegion(customRect, "RimMind.ModelService.Settings.AddCustomEndpoint.Desc".Translate());
             curBtnX += 135f;
@@ -380,24 +389,27 @@ namespace RimMind.ModelService.Settings
             }
 
             // Execute deferral modifications
-            if (deleteIndex >= 0)
+            lock (settings.endpoints)
             {
-                settings.endpoints.RemoveAt(deleteIndex);
-                SyncPriorities(settings.endpoints);
-            }
-            else if (moveUpIndex > 0)
-            {
-                var temp = settings.endpoints[moveUpIndex];
-                settings.endpoints[moveUpIndex] = settings.endpoints[moveUpIndex - 1];
-                settings.endpoints[moveUpIndex - 1] = temp;
-                SyncPriorities(settings.endpoints);
-            }
-            else if (moveDownIndex >= 0 && moveDownIndex < settings.endpoints.Count - 1)
-            {
-                var temp = settings.endpoints[moveDownIndex];
-                settings.endpoints[moveDownIndex] = settings.endpoints[moveDownIndex + 1];
-                settings.endpoints[moveDownIndex + 1] = temp;
-                SyncPriorities(settings.endpoints);
+                if (deleteIndex >= 0 && deleteIndex < settings.endpoints.Count)
+                {
+                    settings.endpoints.RemoveAt(deleteIndex);
+                    SyncPriorities(settings.endpoints);
+                }
+                else if (moveUpIndex > 0 && moveUpIndex < settings.endpoints.Count)
+                {
+                    var temp = settings.endpoints[moveUpIndex];
+                    settings.endpoints[moveUpIndex] = settings.endpoints[moveUpIndex - 1];
+                    settings.endpoints[moveUpIndex - 1] = temp;
+                    SyncPriorities(settings.endpoints);
+                }
+                else if (moveDownIndex >= 0 && moveDownIndex < settings.endpoints.Count - 1)
+                {
+                    var temp = settings.endpoints[moveDownIndex];
+                    settings.endpoints[moveDownIndex] = settings.endpoints[moveDownIndex + 1];
+                    settings.endpoints[moveDownIndex + 1] = temp;
+                    SyncPriorities(settings.endpoints);
+                }
             }
 
             Widgets.EndScrollView();

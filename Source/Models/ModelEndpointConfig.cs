@@ -16,22 +16,7 @@ namespace RimMind.ModelService.Models
         public int weight = 1;
         public bool isEnabled = true;
 
-        // Cached loopback check
-        private string? _cachedLoopbackEndpoint;
-        private bool _cachedIsLoopback;
-
-        public bool IsLoopbackAddress
-        {
-            get
-            {
-                if (_cachedLoopbackEndpoint != endpoint)
-                {
-                    _cachedLoopbackEndpoint = endpoint;
-                    _cachedIsLoopback = Security.LocalLoopbackValidator.IsLoopbackAddress(endpoint);
-                }
-                return _cachedIsLoopback;
-            }
-        }
+        public bool IsLoopbackAddress => Security.LocalLoopbackValidator.IsLoopbackAddress(endpoint);
 
         // Runtime diagnostics (thread-safe, not saved to XML)
         private int _consecutiveFailures;

@@ -1,10 +1,12 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading.Tasks;
 using RimMind.Domain.Common;
 using RimMind.Domain.Llm;
 using RimMind.Domain.ValueObjects;
 using RimMind.ModelService.Balancing;
+using RimMind.ModelService.Client;
 using RimMind.ModelService.Models;
 using RimMind.ModelService.Protocol;
 using RimMind.ModelService.Security;
@@ -45,6 +47,85 @@ namespace RimMind.ModelService.Tests.Contracts
                     Assert.False(LocalLoopbackValidator.IsLoopbackAddress(null));
                     Assert.False(LocalLoopbackValidator.IsLoopbackAddress(""));
                     Assert.False(LocalLoopbackValidator.IsLoopbackAddress("   "));
+                }));
+        }
+
+        [Fact]
+        public async Task ModelServiceClient_concurrency_and_cancellation_resilience()
+        {
+            await ContractCaseRunner.RunAsync(
+                ("pre-cancelled envelope returns Cancelled error immediately without failing node", async () =>
+                {
+                    var node = new ModelEndpointConfig { id = "node-1", isEnabled = true, endpoint = "http://127.0.0.1:8000/v1" };
+                    var endpoints = new List<ModelEndpointConfig> { node };
+                    var client = new ModelServiceClient(
+                        () => endpoints,
+                        () => BalancingStrategy.PriorityFailover);
+
+                    using var cts = new System.Threading.CancellationTokenSource();
+                    cts.Cancel();
+
+                    var envelope = new LlmRequestEnvelope
+                    {
+                        RequestId = "req-cancel-1",
+                        Ct = cts.Token
+                    };
+
+                    var result = await client.SendAsync(envelope);
+                    Assert.True(result.IsErr);
+                    Assert.Equal(RimMindErrorCode.Cancelled, result.Error.Code);
+                    Assert.Equal(0, node.consecutiveFailures);
+                    Assert.True(node.isHealthy);
+                }),
+                ("IsLoopbackAddress reflects endpoint modifications dynamically and safely", async () =>
+                {
+                    var node = new ModelEndpointConfig { endpoint = "http://127.0.0.1:8000/v1" };
+                    Assert.True(node.IsLoopbackAddress);
+
+                    node.endpoint = "https://api.openai.com/v1";
+                    Assert.False(node.IsLoopbackAddress);
+
+                    node.endpoint = "http://localhost:5000";
+                    Assert.True(node.IsLoopbackAddress);
+                    await Task.CompletedTask;
+                }),
+                ("concurrent modification during endpoints reading does not throw", async () =>
+                {
+                    var endpoints = new List<ModelEndpointConfig>();
+                    for (int i = 0; i < 10; i++)
+                    {
+                        endpoints.Add(new ModelEndpointConfig { id = $"node-{i}", isEnabled = true });
+                    }
+
+                    var client = new ModelServiceClient(
+                        () => endpoints,
+                        () => BalancingStrategy.PriorityFailover);
+
+                    using var cts = new System.Threading.CancellationTokenSource();
+                    cts.Cancel();
+
+                    var envelope = new LlmRequestEnvelope { RequestId = "test", Ct = cts.Token };
+
+                    var modifyTask = Task.Run(() =>
+                    {
+                        for (int i = 0; i < 50; i++)
+                        {
+                            lock (endpoints)
+                            {
+                                endpoints.Add(new ModelEndpointConfig { id = $"dyn-{i}" });
+                                if (endpoints.Count > 15) endpoints.RemoveAt(0);
+                            }
+                        }
+                    });
+
+                    for (int i = 0; i < 50; i++)
+                    {
+                        var res = await client.SendAsync(envelope);
+                        Assert.Equal(RimMindErrorCode.Cancelled, res.Error.Code);
+                        Assert.True(client.IsConfigured());
+                    }
+
+                    await modifyTask;
                 }));
         }
 
