@@ -33,7 +33,7 @@
 ## 🎮 实机特性展示
 
 ![RimMind-Extension-ModelService 实机展示](docs/images/showcase.jpg)
-*扩展模型网关设置界面：实时监测与 OpenCode Go 端点的毫秒级网络延迟，并配置多端点自动容灾策略。*
+*扩展模型网关设置实机：配置 `Priority Failover` / `Round Robin` 负载均衡策略、一键添加 `Codex Preset` 与 `OpenCode Go Preset` 预设节点，并通过 `Local Loopback Secured`（`127.0.0.1:8000`）本机回环安全校验。*
 
 ---
 

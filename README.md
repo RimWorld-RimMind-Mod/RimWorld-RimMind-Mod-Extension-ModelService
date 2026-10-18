@@ -33,7 +33,7 @@
 ## 🎮 In-Game Showcase
 
 ![RimMind-Extension-ModelService Showcase](docs/images/showcase.jpg)
-*High-speed gateway settings: Testing real-time connection latency with OpenCode Go and configuring automatic endpoint failover.*
+*Multi-node gateway & failover settings: Configuring `Priority Failover` / `Round Robin` load balancing, one-click `Codex Preset` & `OpenCode Go Preset` nodes, and `Local Loopback Secured` (`127.0.0.1:8000`) verification.*
 
 ---
 
