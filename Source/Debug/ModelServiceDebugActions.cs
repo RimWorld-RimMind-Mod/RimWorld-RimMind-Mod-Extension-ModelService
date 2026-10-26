@@ -2,6 +2,7 @@ using System;
 using System.Diagnostics;
 using System.Threading.Tasks;
 using RimMind.Application.Common.Interfaces;
+using RimMind.Presentation.Api;
 using RimMind.ModelService.Diagnostics;
 using RimMind.ModelService.Models;
 using RimMind.ModelService.Settings;
@@ -18,22 +19,25 @@ namespace RimMind.ModelService.Debug
         public static void TestAllEndpoints()
         {
             var settings = RimMindModelServiceMod.Settings;
-            if (settings == null || settings.endpoints.Count == 0)
+            var snapshot = settings?.GetEndpointsSnapshot() ?? Array.Empty<ModelEndpointConfig>();
+            if (snapshot.Length == 0)
             {
                 Messages.Message("RimMind.ModelService.Debug.NoEndpoints".Translate(), MessageTypeDefOf.NeutralEvent, false);
                 return;
             }
 
-            Messages.Message("RimMind.ModelService.Debug.ProbingAll".Translate(settings.endpoints.Count), MessageTypeDefOf.NeutralEvent, false);
+            Messages.Message("RimMind.ModelService.Debug.ProbingAll".Translate(snapshot.Length), MessageTypeDefOf.NeutralEvent, false);
 
-            foreach (var node in settings.endpoints)
+            foreach (var node in snapshot)
             {
                 var targetNode = node;
+                if (targetNode == null) continue;
                 Task.Run(async () =>
                 {
                     var (isOk, rttMs, error) = await EndpointHealthProbe.ProbeEndpointAsync(targetNode);
 
-                    LongEventHandler.ExecuteWhenFinished(() =>
+                    // Task.Run body: Verse calls must be marshalled back to the main thread.
+                    RimMindAPI.MainThread.Post(() =>
                     {
                         if (isOk)
                         {

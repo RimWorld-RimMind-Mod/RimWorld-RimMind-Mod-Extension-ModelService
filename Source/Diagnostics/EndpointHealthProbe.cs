@@ -63,18 +63,28 @@ namespace RimMind.ModelService.Diagnostics
                 stopwatch.Stop();
                 int latency = (int)stopwatch.ElapsedMilliseconds;
 
-                // Even if 401 or 404 is returned, the endpoint is reachable at the network level
-                if (response.IsSuccessStatusCode || (int)response.StatusCode == 401 || (int)response.StatusCode == 404)
+                int statusCode = (int)response.StatusCode;
+
+                // 401/403 means network-reachable, but credentials are rejected — do NOT mark healthy or reset failures.
+                if (statusCode == 401 || statusCode == 403)
+                {
+                    endpoint.lastLatencyMs = latency;
+                    endpoint.isHealthy = false;
+                    return (false, latency, $"HTTP {statusCode} reachable but unauthorized");
+                }
+
+                // 2xx or 404 (some gateways do not expose /models) means reachable and not auth-rejected
+                if (response.IsSuccessStatusCode || statusCode == 404)
                 {
                     endpoint.RecordSuccess(latency);
                     endpoint.isHealthy = true;
-                    return (true, latency, $"HTTP {(int)response.StatusCode} reachable");
+                    return (true, latency, $"HTTP {statusCode} reachable");
                 }
                 else
                 {
                     endpoint.lastLatencyMs = latency;
                     endpoint.isHealthy = false;
-                    return (false, latency, $"HTTP {(int)response.StatusCode} {response.ReasonPhrase}");
+                    return (false, latency, $"HTTP {statusCode} {response.ReasonPhrase}");
                 }
             }
             catch (Exception ex)

@@ -189,6 +189,24 @@ namespace RimMind.ModelService.Tests.Contracts
                     Assert.Equal(2, picks.Count(id => id == "n1"));
                     Assert.Equal(2, picks.Count(id => id == "n2"));
                     Assert.Equal(2, picks.Count(id => id == "n3"));
+                }),
+                ("weighted round robin honors node weights proportionally", () =>
+                {
+                    var heavy = new ModelEndpointConfig { id = "heavy", weight = 3, isEnabled = true };
+                    var light = new ModelEndpointConfig { id = "light", weight = 1, isEnabled = true };
+                    var balancer = new LoadBalancer();
+                    var nodes = new[] { heavy, light };
+
+                    var picks = new List<string>();
+                    for (int i = 0; i < 8; i++)
+                    {
+                        var pick = balancer.SelectEndpoint(nodes, BalancingStrategy.RoundRobin, 100);
+                        Assert.NotNull(pick);
+                        picks.Add(pick!.id);
+                    }
+
+                    Assert.Equal(6, picks.Count(id => id == "heavy"));
+                    Assert.Equal(2, picks.Count(id => id == "light"));
                 }));
         }
 
@@ -418,17 +436,46 @@ namespace RimMind.ModelService.Tests.Contracts
                     Assert.Equal("https://opencode.ai/zen/go/v1", openCode.endpoint);
                     Assert.Equal(ProviderType.OpenCodeGo, openCode.providerType);
                 }),
-                ("ResetToDefault clears and restores default presets", () =>
+                ("ResetToDefault clears and restores default presets while preserving list instance under EndpointSyncRoot", () =>
                 {
                     var settings = new ModelServiceSettings();
+                    var originalList = settings.endpoints;
+                    var originalSyncRoot = settings.EndpointSyncRoot;
+                    Assert.Same(originalList, originalSyncRoot);
+
+                    settings.enableService = false;
+                    settings.balancingStrategy = BalancingStrategy.RoundRobin;
                     settings.endpoints.Clear();
                     settings.endpoints.Add(new ModelEndpointConfig { name = "Custom" });
                     Assert.Single(settings.endpoints);
 
-                    settings.ResetToDefault();
+                    bool resetCompleted = false;
+                    Task? resetTask = null;
+                    lock (settings.EndpointSyncRoot)
+                    {
+                        resetTask = Task.Run(() =>
+                        {
+                            settings.ResetToDefault();
+                            System.Threading.Volatile.Write(ref resetCompleted, true);
+                        });
+                        System.Threading.Thread.Sleep(30);
+                        Assert.False(System.Threading.Volatile.Read(ref resetCompleted));
+                    }
+                    resetTask!.GetAwaiter().GetResult();
+                    Assert.True(System.Threading.Volatile.Read(ref resetCompleted));
+
+                    Assert.True(settings.enableService);
+                    Assert.Equal(BalancingStrategy.PriorityFailover, settings.balancingStrategy);
+                    Assert.Same(originalList, settings.endpoints);
+                    Assert.Same(originalSyncRoot, settings.EndpointSyncRoot);
                     Assert.Equal(2, settings.endpoints.Count);
                     Assert.Equal("Codex Local Gateway (sub2api)", settings.endpoints[0].name);
                     Assert.Equal("OpenCode Go (Direct)", settings.endpoints[1].name);
+
+                    var snapshot = settings.GetEndpointsSnapshot();
+                    Assert.Equal(2, snapshot.Length);
+                    Assert.Same(settings.endpoints[0], snapshot[0]);
+                    Assert.Same(settings.endpoints[1], snapshot[1]);
                 }),
                 ("EnsureDefaultEndpoints seeds presets when list is empty", () =>
                 {
@@ -793,7 +840,143 @@ namespace RimMind.ModelService.Tests.Contracts
                     {
                         listener.Stop();
                     }
+                }),
+                ("HTTP 401 unauthorized response marks endpoint unhealthy without resetting failure count", async () =>
+                {
+                    var listener = new System.Net.Sockets.TcpListener(System.Net.IPAddress.Loopback, 0);
+                    listener.Start();
+                    int port = ((System.Net.IPEndPoint)listener.LocalEndpoint).Port;
+
+                    var serverTask = Task.Run(async () =>
+                    {
+                        using var tcpClient = await listener.AcceptTcpClientAsync();
+                        using var stream = tcpClient.GetStream();
+                        var buffer = new byte[1024];
+                        _ = await stream.ReadAsync(buffer, 0, buffer.Length);
+                        byte[] respBytes = System.Text.Encoding.ASCII.GetBytes(
+                            "HTTP/1.1 401 Unauthorized\r\nContent-Length: 0\r\nConnection: close\r\n\r\n");
+                        await stream.WriteAsync(respBytes, 0, respBytes.Length);
+                        await stream.FlushAsync();
+                    });
+
+                    try
+                    {
+                        var ep = new ModelEndpointConfig
+                        {
+                            id = "unauth-node",
+                            name = "Unauth Node",
+                            endpoint = $"http://127.0.0.1:{port}/v1",
+                            providerType = ProviderType.OpenAICompatible,
+                            isHealthy = true,
+                            consecutiveFailures = 2
+                        };
+
+                        var (success, latency, msg) = await RimMind.ModelService.Diagnostics.EndpointHealthProbe.ProbeEndpointAsync(ep);
+                        await serverTask;
+
+                        Assert.False(success);
+                        Assert.False(ep.isHealthy);
+                        Assert.Equal(2, ep.consecutiveFailures);
+                        Assert.True(latency >= 0);
+                        Assert.Contains("reachable but unauthorized", msg);
+                    }
+                    finally
+                    {
+                        listener.Stop();
+                    }
                 }));
+        }
+
+        [Fact]
+        public async Task ModelServiceClient_permanent_vs_transient_failover_and_failure_timestamp_contracts()
+        {
+            // 1. Permanent HTTP 400 error returns immediately without failing over or penalizing the node
+            var primary400 = new ModelEndpointConfig { id = "p-400", name = "Primary", endpoint = "https://primary.example/v1", priority = 0, isEnabled = true };
+            var backup400 = new ModelEndpointConfig { id = "b-400", name = "Backup", endpoint = "https://backup.example/v1", priority = 1, isEnabled = true };
+            int callCount400 = 0;
+            long fakeClockMs = 10_000L;
+
+            using (var client400 = new ModelServiceClient(
+                () => new List<ModelEndpointConfig> { primary400, backup400 },
+                () => BalancingStrategy.PriorityFailover,
+                loadBalancer: null,
+                httpSendOverride: (_, _) =>
+                {
+                    callCount400++;
+                    return Task.FromResult(new System.Net.Http.HttpResponseMessage(System.Net.HttpStatusCode.BadRequest)
+                    {
+                        Content = new System.Net.Http.StringContent("{\"error\":\"invalid_request_error with Bearer sk-secret999999999999\"}", System.Text.Encoding.UTF8, "application/json")
+                    });
+                },
+                clockMsOverride: () => fakeClockMs))
+            {
+                var res400 = await client400.SendAsync(new LlmRequestEnvelope { RequestId = "req-400" });
+                Assert.True(res400.IsErr);
+                Assert.Equal(RimMindErrorCode.ClientPermanentFailure, res400.Error.Code);
+                Assert.Equal(1, callCount400);
+                Assert.Equal(0, primary400.consecutiveFailures);
+                Assert.DoesNotContain("sk-secret999999999999", res400.Error.Message);
+            }
+
+            // 2. Transient HTTP 503 records failure at the actual failure-time clock and fails over to backup; rogue LocalSubscriptionGateway also fails over when backup exists
+            var rogueGateway = new ModelEndpointConfig
+            {
+                id = "rogue-local",
+                name = "Rogue Local",
+                endpoint = "https://non-loopback.example/v1",
+                providerType = ProviderType.LocalSubscriptionGateway,
+                priority = 0,
+                isEnabled = true
+            };
+            var primary503 = new ModelEndpointConfig
+            {
+                id = "p-503",
+                name = "Primary 503",
+                endpoint = "https://primary503.example/v1",
+                providerType = ProviderType.OpenAICompatible,
+                priority = 1,
+                isEnabled = true
+            };
+            var healthyBackup = new ModelEndpointConfig
+            {
+                id = "b-200",
+                name = "Healthy Backup",
+                endpoint = "https://backup200.example/v1",
+                providerType = ProviderType.OpenAICompatible,
+                priority = 2,
+                isEnabled = true
+            };
+
+            long dynamicClock = 50_000L;
+            using (var failoverClient = new ModelServiceClient(
+                () => new List<ModelEndpointConfig> { rogueGateway, primary503, healthyBackup },
+                () => BalancingStrategy.PriorityFailover,
+                loadBalancer: null,
+                httpSendOverride: (req, _) =>
+                {
+                    dynamicClock += 5_000L; // simulate 5 seconds elapsed during request
+                    if (req.RequestUri!.Host.Contains("primary503"))
+                    {
+                        return Task.FromResult(new System.Net.Http.HttpResponseMessage(System.Net.HttpStatusCode.ServiceUnavailable)
+                        {
+                            Content = new System.Net.Http.StringContent("Service Unavailable", System.Text.Encoding.UTF8, "text/plain")
+                        });
+                    }
+                    return Task.FromResult(new System.Net.Http.HttpResponseMessage(System.Net.HttpStatusCode.OK)
+                    {
+                        Content = new System.Net.Http.StringContent("{\"id\":\"ok\",\"choices\":[{\"message\":{\"role\":\"assistant\",\"content\":\"Backup OK\"}}]}", System.Text.Encoding.UTF8, "application/json")
+                    });
+                },
+                clockMsOverride: () => dynamicClock))
+            {
+                var resOk = await failoverClient.SendAsync(new LlmRequestEnvelope { RequestId = "req-failover" });
+                Assert.True(resOk.IsOk);
+                Assert.Equal("Backup OK", resOk.Value.Content);
+                Assert.Equal(1, rogueGateway.consecutiveFailures);
+                Assert.Equal(1, primary503.consecutiveFailures);
+                Assert.Equal(55_000L, primary503.LastFailureTimestampMs);
+                Assert.Equal(0, healthyBackup.consecutiveFailures);
+            }
         }
 
         private sealed class CoreSettingsStub : RimMind.Application.Common.Interfaces.Internal.ISettingsProvider

@@ -30,6 +30,7 @@
     <Compile Include="../Source/Models/ProviderType.cs" />
     <Compile Include="../Source/Models/ModelEndpointConfig.cs" />
     <Compile Include="../Source/Models/ModelEndpointPresets.cs" />
+    <Compile Include="../Source/Client/EnvironmentEndpointOverlay.cs" />
     <Compile Include="../Source/Settings/ModelServiceSettings.cs" />
     <Compile Include="../Source/Security/LocalLoopbackValidator.cs" />
     <Compile Include="../Source/Balancing/LoadBalancer.cs" />

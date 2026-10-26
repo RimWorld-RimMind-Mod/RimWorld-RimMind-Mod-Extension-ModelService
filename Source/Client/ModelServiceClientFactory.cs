@@ -27,33 +27,18 @@ namespace RimMind.ModelService.Client
         public IAIClient Create(ISettingsProvider settings)
         {
             var msSettings = RimMindModelServiceMod.Settings;
-            string? testKey = Environment.GetEnvironmentVariable("RIMMIND_TEST_API_KEY");
-            string? backupKey = Environment.GetEnvironmentVariable("RIMMIND_BACKUP_API_KEY");
-            string? effectiveOpenCodeKey = !string.IsNullOrWhiteSpace(backupKey) ? backupKey : testKey;
-            if (!string.IsNullOrEmpty(effectiveOpenCodeKey) && msSettings?.endpoints != null)
-            {
-                string? backupEndpoint = Environment.GetEnvironmentVariable("RIMMIND_BACKUP_ENDPOINT")
-                    ?? Environment.GetEnvironmentVariable("RIMMIND_TEST_ENDPOINT");
-                string? backupModel = Environment.GetEnvironmentVariable("RIMMIND_BACKUP_MODEL")
-                    ?? Environment.GetEnvironmentVariable("RIMMIND_TEST_MODEL");
-                lock (msSettings.endpoints)
-                {
-                    foreach (var ep in msSettings.endpoints)
-                    {
-                        if (string.IsNullOrEmpty(ep.apiKey) && ep.providerType == ProviderType.OpenCodeGo)
-                        {
-                            ep.apiKey = effectiveOpenCodeKey!;
-                            if (!string.IsNullOrEmpty(backupEndpoint)) ep.endpoint = backupEndpoint!;
-                            if (!string.IsNullOrEmpty(backupModel)) ep.modelName = backupModel!;
-                        }
-                    }
-                }
-            }
+            // Automation credentials are overlaid on shadow copies; persisted settings are never mutated.
+            var envOverlay = EnvironmentEndpointOverlay.FromEnvironment();
 
             return new ModelServiceClient(
-                () => (msSettings != null && msSettings.enableService && msSettings.endpoints != null)
-                    ? msSettings.endpoints
-                    : (IReadOnlyList<ModelEndpointConfig>)Array.Empty<ModelEndpointConfig>(),
+                () =>
+                {
+                    if (msSettings == null || !msSettings.enableService || msSettings.endpoints == null)
+                        return Array.Empty<ModelEndpointConfig>();
+                    return envOverlay == null
+                        ? msSettings.endpoints
+                        : envOverlay.Apply(msSettings.endpoints);
+                },
                 () => msSettings?.balancingStrategy ?? BalancingStrategy.PriorityFailover);
         }
     }

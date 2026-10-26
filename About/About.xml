@@ -6,6 +6,7 @@
   <modVersion>1.0.0</modVersion>
   <supportedVersions>
     <li>1.6</li>
+    <li>1.7</li>
   </supportedVersions>
   <description>Extended Model Service Provider and Local Gateway adapter for RimMind. Adds support for multi-provider routing (OpenAI-compatible, Anthropic Claude Messages, Local Subscription Gateways / sub2api / newapi / Codex Proxy) with auto-failover, load balancing, and connectivity diagnostics. [v1.0]</description>
   <modDependencies>

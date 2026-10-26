@@ -4,6 +4,7 @@ using System.Diagnostics;
 using System.Linq;
 using System.Net.Http;
 using System.Text;
+using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
 using RimMind.Application.Common.Interfaces.Client;
@@ -20,28 +21,64 @@ namespace RimMind.ModelService.Client
 {
     public class ModelServiceClient : IAIClient
     {
+        private const int MaxErrorBodyChars = 500;
+        private const int DefaultOverallTimeoutSeconds = 180;
+
+        private static readonly Regex SecretRedactionRegex = new Regex(
+            @"(?i)(?:Bearer\s+[A-Za-z0-9\-\._~\+\/=]{4,}|\b(?:sk|oc_sk|sk-ant|sk-proj)[\-_][A-Za-z0-9\-_]{8,})",
+            RegexOptions.Compiled);
+
         private static readonly HttpClient HttpClient = new HttpClient(new HttpClientHandler
         {
             AllowAutoRedirect = false
         })
         {
-            Timeout = TimeSpan.FromSeconds(60)
+            Timeout = Timeout.InfiniteTimeSpan
         };
 
         private readonly Func<IReadOnlyList<ModelEndpointConfig>> _endpointsProvider;
         private readonly Func<BalancingStrategy> _strategyProvider;
         private readonly ILoadBalancer _loadBalancer;
+        private readonly Func<HttpRequestMessage, CancellationToken, Task<HttpResponseMessage>> _httpSend;
+        private readonly Func<long> _clockMs;
         private bool _disposed;
+
+        public int OverallTimeoutSeconds { get; set; } = DefaultOverallTimeoutSeconds;
 
         public ModelServiceClient(
             Func<IReadOnlyList<ModelEndpointConfig>> endpointsProvider,
             Func<BalancingStrategy> strategyProvider,
             ILoadBalancer? loadBalancer = null)
+            : this(endpointsProvider, strategyProvider, loadBalancer, null, null)
+        {
+        }
+
+        internal ModelServiceClient(
+            Func<IReadOnlyList<ModelEndpointConfig>> endpointsProvider,
+            Func<BalancingStrategy> strategyProvider,
+            ILoadBalancer? loadBalancer,
+            Func<HttpRequestMessage, CancellationToken, Task<HttpResponseMessage>>? httpSendOverride,
+            Func<long>? clockMsOverride = null)
         {
             _endpointsProvider = endpointsProvider ?? throw new ArgumentNullException(nameof(endpointsProvider));
             _strategyProvider = strategyProvider ?? throw new ArgumentNullException(nameof(strategyProvider));
             _loadBalancer = loadBalancer ?? new LoadBalancer();
+            _httpSend = httpSendOverride ?? ((req, ct) => HttpClient.SendAsync(req, ct));
+            _clockMs = clockMsOverride ?? (() => DateTimeOffset.UtcNow.ToUnixTimeMilliseconds());
         }
+
+        private static string SanitizeAndTruncate(string? text, int maxChars = MaxErrorBodyChars)
+        {
+            if (string.IsNullOrEmpty(text)) return string.Empty;
+            string redacted = SecretRedactionRegex.Replace(text!, "***");
+            if (maxChars > 0 && redacted.Length > maxChars)
+                return redacted.Substring(0, maxChars) + $"…[truncated {redacted.Length - maxChars} chars]";
+            return redacted;
+        }
+
+        private static bool IsTransientError(RimMindError error) =>
+            error.Code == RimMindErrorCode.ClientTransientFailure ||
+            error.Code == RimMindErrorCode.Timeout;
 
         public bool IsLocalEndpoint => false;
         public bool IsConfigured() => GetEndpointsSafe().Any(e => e.isEnabled);
@@ -82,77 +119,111 @@ namespace RimMind.ModelService.Client
             }
         }
 
-        public async Task<Result<LlmResponse, RimMindError>> SendAsync(LlmRequestEnvelope envelope)
+        public Task<Result<LlmResponse, RimMindError>> SendAsync(LlmRequestEnvelope envelope)
         {
-            if (envelope.Ct.IsCancellationRequested)
+            return SendCoreAsync(envelope, envelope.Ct);
+        }
+
+        private async Task<Result<LlmResponse, RimMindError>> SendCoreAsync(
+            LlmRequestEnvelope envelope,
+            CancellationToken callerToken)
+        {
+            if (callerToken.IsCancellationRequested)
             {
                 return Result<LlmResponse, RimMindError>.Err(RimMindErrors.Cancelled());
             }
 
             var endpoints = GetEndpointsSafe();
-            if (endpoints == null || endpoints.Length == 0)
+            var enabledEndpoints = endpoints?.Where(e => e != null && e.isEnabled).ToList();
+            if (enabledEndpoints == null || enabledEndpoints.Count == 0)
             {
                 return Result<LlmResponse, RimMindError>.Err(
                     RimMindErrors.ClientNotConfigured("No model service endpoints configured."));
             }
 
             var strategy = _strategyProvider();
-            long currentTick = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+            int overallSec = Math.Max(5, OverallTimeoutSeconds);
+            using var overallCts = new CancellationTokenSource(TimeSpan.FromSeconds(overallSec));
+            using var overallLinkedCts = CancellationTokenSource.CreateLinkedTokenSource(callerToken, overallCts.Token);
+            CancellationToken overallToken = overallLinkedCts.Token;
 
             var triedEndpoints = new HashSet<string>();
-            var eligible = _loadBalancer.GetEligibleEndpoints(endpoints, currentTick);
-            // If all endpoints are temporarily isolated by circuit breaker, fall back to enabled endpoints
-            // so LoadBalancer.SelectEndpoint can execute its self-healing probe branch!
-            var candidatePool = eligible.Count > 0
-                ? eligible
-                : endpoints.Where(e => e.isEnabled).ToList();
-
-            int maxAttempts = Math.Max(1, candidatePool.Count);
+            int maxAttempts = Math.Max(1, enabledEndpoints.Count);
             string lastErrorMessage = "";
+            RimMindError? lastError = null;
+            RimMindError? lastSecurityError = null;
 
             for (int attempt = 0; attempt < maxAttempts; attempt++)
             {
-                if (envelope.Ct.IsCancellationRequested)
+                if (callerToken.IsCancellationRequested)
                 {
                     return Result<LlmResponse, RimMindError>.Err(RimMindErrors.Cancelled());
                 }
+                if (overallCts.IsCancellationRequested)
+                {
+                    return Result<LlmResponse, RimMindError>.Err(
+                        RimMindErrors.Timeout($"ModelService request timed out after {overallSec}s. Last error: {lastErrorMessage}"));
+                }
 
-                var candidates = candidatePool.Where(e => !triedEndpoints.Contains(e.id)).ToList();
-                var node = _loadBalancer.SelectEndpoint(candidates, strategy, currentTick);
+                long nowMs = _clockMs();
+                var untried = enabledEndpoints.Where(e => !triedEndpoints.Contains(e.id)).ToList();
+                if (untried.Count == 0) break;
+
+                var node = _loadBalancer.SelectEndpoint(untried, strategy, nowMs);
                 if (node == null) break;
 
                 triedEndpoints.Add(node.id);
 
-                if (node.providerType == ProviderType.LocalSubscriptionGateway)
+                if (node.providerType == ProviderType.LocalSubscriptionGateway && !node.IsLoopbackAddress)
                 {
-                    if (!node.IsLoopbackAddress)
-                    {
-                        node.RecordFailure(currentTick);
-                        return Result<LlmResponse, RimMindError>.Err(
-                            RimMindErrors.ClientPermanent("Security violation: Local subscription gateway must be on loopback (127.0.0.1)"));
-                    }
+                    long failTick = _clockMs();
+                    node.RecordFailure(failTick);
+                    lastSecurityError = RimMindErrors.ClientPermanent(
+                        "Security violation: Local subscription gateway must be on loopback (127.0.0.1)");
+                    lastErrorMessage = lastSecurityError.Message;
+                    continue;
                 }
 
-                var result = await TrySendToNodeAsync(envelope, node).ConfigureAwait(false);
+                var result = await TrySendToNodeAsync(envelope, node, overallToken, callerToken).ConfigureAwait(false);
                 if (result.IsOk)
                 {
                     return result;
                 }
 
-                if (envelope.Ct.IsCancellationRequested || result.Error.Code == RimMindErrorCode.Cancelled)
+                if (callerToken.IsCancellationRequested || result.Error.Code == RimMindErrorCode.Cancelled)
                 {
                     return result.Error.Code == RimMindErrorCode.Cancelled
                         ? result
                         : Result<LlmResponse, RimMindError>.Err(RimMindErrors.Cancelled());
                 }
 
+                // Permanent client errors (400 bad request, context length, 401/403 auth) must NOT trip the circuit
+                // breaker or cascade across all backup endpoints.
+                if (!IsTransientError(result.Error))
+                {
+                    return result;
+                }
+
+                long failureTimestampMs = _clockMs();
+                node.RecordFailure(failureTimestampMs);
+                lastError = result.Error;
                 lastErrorMessage = result.Error.Message;
-                node.RecordFailure(currentTick);
             }
 
-            if (envelope.Ct.IsCancellationRequested)
+            if (callerToken.IsCancellationRequested)
             {
                 return Result<LlmResponse, RimMindError>.Err(RimMindErrors.Cancelled());
+            }
+
+            if (lastError == null && lastSecurityError != null)
+            {
+                return Result<LlmResponse, RimMindError>.Err(lastSecurityError);
+            }
+
+            if (lastError != null && lastError.Code == RimMindErrorCode.Timeout)
+            {
+                return Result<LlmResponse, RimMindError>.Err(
+                    RimMindErrors.Timeout($"All candidate endpoints timed out. Last error: {lastErrorMessage}"));
             }
 
             return Result<LlmResponse, RimMindError>.Err(
@@ -161,8 +232,13 @@ namespace RimMind.ModelService.Client
 
         private async Task<Result<LlmResponse, RimMindError>> TrySendToNodeAsync(
             LlmRequestEnvelope envelope,
-            ModelEndpointConfig node)
+            ModelEndpointConfig node,
+            CancellationToken overallToken,
+            CancellationToken callerToken)
         {
+            int attemptTimeoutSec = Math.Max(5, node.timeoutSeconds);
+            using var attemptCts = new CancellationTokenSource(TimeSpan.FromSeconds(attemptTimeoutSec));
+            using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(overallToken, attemptCts.Token);
             var stopwatch = Stopwatch.StartNew();
             try
             {
@@ -216,14 +292,15 @@ namespace RimMind.ModelService.Client
                 using var content = new StringContent(payloadJson, Encoding.UTF8, "application/json");
                 request.Content = content;
 
-                using var response = await HttpClient.SendAsync(request, envelope.Ct).ConfigureAwait(false);
+                using var response = await _httpSend(request, linkedCts.Token).ConfigureAwait(false);
                 string responseBody = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
                 stopwatch.Stop();
 
                 if (!response.IsSuccessStatusCode)
                 {
                     int statusCode = (int)response.StatusCode;
-                    string errMsg = $"Node '{node.name}' HTTP {statusCode}: {responseBody}";
+                    string safeBody = SanitizeAndTruncate(responseBody);
+                    string errMsg = $"Node '{node.name}' HTTP {statusCode}: {safeBody}";
                     return Result<LlmResponse, RimMindError>.Err(
                         (statusCode == 429 || statusCode >= 500 || statusCode == 408)
                             ? RimMindErrors.ClientTransient(errMsg)
@@ -254,27 +331,37 @@ namespace RimMind.ModelService.Client
             catch (OperationCanceledException)
             {
                 stopwatch.Stop();
-                if (envelope.Ct.IsCancellationRequested)
+                if (callerToken.IsCancellationRequested)
                 {
                     return Result<LlmResponse, RimMindError>.Err(RimMindErrors.Cancelled());
                 }
                 return Result<LlmResponse, RimMindError>.Err(
-                    RimMindErrors.ClientTransient("Request was canceled."));
+                    RimMindErrors.Timeout($"Node '{node.name}' timed out after {attemptTimeoutSec}s."));
             }
             catch (Exception ex)
             {
                 stopwatch.Stop();
                 return Result<LlmResponse, RimMindError>.Err(
-                    RimMindErrors.ClientTransient($"Failed to reach node '{node.name}': {ex.Message}"));
+                    RimMindErrors.ClientTransient($"Failed to reach node '{node.name}': {SanitizeAndTruncate(ex.Message)}", ex));
             }
         }
 
-        public Task<Result<LlmResponse, RimMindError>> SendStreamAsync(
+        public async Task<Result<LlmResponse, RimMindError>> SendStreamAsync(
             LlmRequestEnvelope envelope,
             Action<LlmChunk> onChunk,
             CancellationToken ct = default)
         {
-            return SendAsync(envelope);
+            if (ct.IsCancellationRequested || envelope.Ct.IsCancellationRequested)
+            {
+                return Result<LlmResponse, RimMindError>.Err(RimMindErrors.Cancelled());
+            }
+
+            using var callerCts = (ct.CanBeCanceled && envelope.Ct.CanBeCanceled && ct != envelope.Ct)
+                ? CancellationTokenSource.CreateLinkedTokenSource(ct, envelope.Ct)
+                : null;
+            CancellationToken effectiveCt = callerCts?.Token ?? (ct.CanBeCanceled ? ct : envelope.Ct);
+
+            return await SendCoreAsync(envelope, effectiveCt).ConfigureAwait(false);
         }
 
         public Task<Result<bool, RimMindError>> SpawnNpcAsync(NpcProfile profile) =>

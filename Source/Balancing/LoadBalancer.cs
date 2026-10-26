@@ -46,8 +46,14 @@ namespace RimMind.ModelService.Balancing
             if (eligible.Count == 0)
             {
                 // If all candidate endpoints are temporarily isolated due to circuit breaker,
-                // fall back to the first enabled one to allow self-healing recovery retry
-                return endpoints.FirstOrDefault(e => e.isEnabled);
+                // fall back to the enabled one whose isolation window / last failure is oldest
+                // to allow self-healing half-open recovery retry.
+                return endpoints
+                    .Where(e => e.isEnabled)
+                    .OrderBy(e => e.isolatedUntilMs)
+                    .ThenBy(e => e.LastFailureTimestampMs)
+                    .ThenBy(e => e.priority)
+                    .FirstOrDefault();
             }
 
             if (strategy == BalancingStrategy.PriorityFailover)
@@ -55,10 +61,26 @@ namespace RimMind.ModelService.Balancing
                 // Lowest priority number = highest preference
                 return eligible.OrderBy(e => e.priority).FirstOrDefault();
             }
-            else // RoundRobin
+            else // RoundRobin (weighted by Math.Max(1, ep.weight))
             {
-                int index = (int)((uint)Interlocked.Increment(ref _roundRobinIndex) % (uint)eligible.Count);
-                return eligible[index];
+                long totalWeight = 0;
+                for (int i = 0; i < eligible.Count; i++)
+                {
+                    totalWeight += Math.Max(1, eligible[i].weight);
+                }
+
+                ulong tick = (ulong)(uint)Interlocked.Increment(ref _roundRobinIndex);
+                long target = (long)(tick % (ulong)totalWeight);
+                long cumulative = 0;
+                for (int i = 0; i < eligible.Count; i++)
+                {
+                    cumulative += Math.Max(1, eligible[i].weight);
+                    if (target < cumulative)
+                    {
+                        return eligible[i];
+                    }
+                }
+                return eligible[0];
             }
         }
     }

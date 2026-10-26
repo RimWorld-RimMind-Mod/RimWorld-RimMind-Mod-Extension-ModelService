@@ -69,7 +69,7 @@ namespace RimMind.ModelService.Settings
             var codexRect = new Rect(curBtnX, buttonRow.y, 140f, 30f);
             if (Widgets.ButtonText(codexRect, "RimMind.ModelService.Settings.AddCodexPreset".Translate()))
             {
-                lock (settings.endpoints)
+                lock (settings.EndpointSyncRoot)
                 {
                     var preset = ModelEndpointPresets.CreateCodexGatewayPreset(settings.endpoints.Count);
                     settings.endpoints.Add(preset);
@@ -82,7 +82,7 @@ namespace RimMind.ModelService.Settings
             var openCodeRect = new Rect(curBtnX, buttonRow.y, 160f, 30f);
             if (Widgets.ButtonText(openCodeRect, "RimMind.ModelService.Settings.AddOpenCodeGoPreset".Translate()))
             {
-                lock (settings.endpoints)
+                lock (settings.EndpointSyncRoot)
                 {
                     var preset = ModelEndpointPresets.CreateOpenCodeGoPreset(settings.endpoints.Count);
                     settings.endpoints.Add(preset);
@@ -95,7 +95,7 @@ namespace RimMind.ModelService.Settings
             var customRect = new Rect(curBtnX, buttonRow.y, 130f, 30f);
             if (Widgets.ButtonText(customRect, "RimMind.ModelService.Settings.AddCustomEndpoint".Translate()))
             {
-                lock (settings.endpoints)
+                lock (settings.EndpointSyncRoot)
                 {
                     settings.endpoints.Add(new ModelEndpointConfig
                     {
@@ -123,16 +123,17 @@ namespace RimMind.ModelService.Settings
             listing.Gap(10f);
 
             // 4. Endpoints Scroll View with Cards (Height ~160f per card)
+            var endpointsSnapshot = settings.GetEndpointsSnapshot();
             float remainingHeight = inRect.height - listing.CurHeight - 16f;
             var outRect = listing.GetRect(Math.Max(140f, remainingHeight));
             float cardHeight = 160f;
             float cardGap = 10f;
-            float totalContentHeight = Math.Max(outRect.height, settings.endpoints.Count * (cardHeight + cardGap) + 20f);
+            float totalContentHeight = Math.Max(outRect.height, endpointsSnapshot.Length * (cardHeight + cardGap) + 20f);
             var viewRect = new Rect(0f, 0f, outRect.width - 24f, totalContentHeight);
 
             Widgets.BeginScrollView(outRect, ref _scrollPosition, viewRect);
 
-            if (settings.endpoints.Count == 0)
+            if (endpointsSnapshot.Length == 0)
             {
                 var emptyRect = new Rect(10f, 20f, viewRect.width - 20f, 30f);
                 GUI.color = Color.gray;
@@ -145,9 +146,9 @@ namespace RimMind.ModelService.Settings
             int moveUpIndex = -1;
             int moveDownIndex = -1;
 
-            for (int i = 0; i < settings.endpoints.Count; i++)
+            for (int i = 0; i < endpointsSnapshot.Length; i++)
             {
-                var endpoint = settings.endpoints[i];
+                var endpoint = endpointsSnapshot[i];
                 var cardRect = new Rect(0f, curY, viewRect.width, cardHeight);
                 Widgets.DrawMenuSection(cardRect);
 
@@ -187,7 +188,7 @@ namespace RimMind.ModelService.Settings
                 TooltipHandler.TipRegion(delRect, "RimMind.ModelService.Settings.RemoveEndpoint".Translate());
 
                 var downRect = new Rect(rightXMax - 96f, row1Y, 30f, 24f);
-                if (i < settings.endpoints.Count - 1)
+                if (i < endpointsSnapshot.Length - 1)
                 {
                     if (Widgets.ButtonText(downRect, "▼"))
                     {
@@ -389,7 +390,7 @@ namespace RimMind.ModelService.Settings
             }
 
             // Execute deferral modifications
-            lock (settings.endpoints)
+            lock (settings.EndpointSyncRoot)
             {
                 if (deleteIndex >= 0 && deleteIndex < settings.endpoints.Count)
                 {
@@ -426,18 +427,21 @@ namespace RimMind.ModelService.Settings
 
         private static void TriggerTestAllEndpoints(ModelServiceSettings settings)
         {
-            foreach (var node in settings.endpoints)
+            var snapshot = settings.GetEndpointsSnapshot();
+            foreach (var node in snapshot)
             {
-                _probingNodes[node.id] = true;
+                var targetNode = node;
+                if (targetNode == null) continue;
+                _probingNodes[targetNode.id] = true;
                 Task.Run(async () =>
                 {
                     try
                     {
-                        await EndpointHealthProbe.ProbeEndpointAsync(node);
+                        await EndpointHealthProbe.ProbeEndpointAsync(targetNode);
                     }
                     finally
                     {
-                        _probingNodes.TryRemove(node.id, out _);
+                        _probingNodes.TryRemove(targetNode.id, out _);
                     }
                 });
             }

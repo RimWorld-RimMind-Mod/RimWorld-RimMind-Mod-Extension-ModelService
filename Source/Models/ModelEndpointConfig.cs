@@ -14,15 +14,28 @@ namespace RimMind.ModelService.Models
         public string modelName = "gpt-4o-mini";
         public int priority = 0; // Lower number = higher priority
         public int weight = 1;
+        public int timeoutSeconds = 60;
         public bool isEnabled = true;
 
         public bool IsLoopbackAddress => Security.LocalLoopbackValidator.IsLoopbackAddress(endpoint);
 
         // Runtime diagnostics (thread-safe, not saved to XML)
+        [NonSerialized]
         private int _consecutiveFailures;
+        [NonSerialized]
         private long _isolatedUntilMs;
+        [NonSerialized]
+        private long _lastFailureTimestampMs;
+        [NonSerialized]
         private int _lastLatencyMs = -1;
+        [NonSerialized]
         private int _isHealthy = 1;
+
+        public long LastFailureTimestampMs
+        {
+            get => Volatile.Read(ref _lastFailureTimestampMs);
+            set => Interlocked.Exchange(ref _lastFailureTimestampMs, value);
+        }
 
         public int consecutiveFailures
         {
@@ -55,12 +68,14 @@ namespace RimMind.ModelService.Models
         {
             consecutiveFailures = 0;
             isolatedUntilMs = 0;
+            LastFailureTimestampMs = 0;
             lastLatencyMs = latencyMs;
             isHealthy = true;
         }
 
         public void RecordFailure(long currentTick, long cooldownTicks = 60000)
         {
+            LastFailureTimestampMs = currentTick;
             int failures = Interlocked.Increment(ref _consecutiveFailures);
             isHealthy = false;
             if (failures >= 3)
@@ -79,6 +94,7 @@ namespace RimMind.ModelService.Models
             Scribe_Values.Look(ref modelName, "modelName", "gpt-4o-mini");
             Scribe_Values.Look(ref priority, "priority", 0);
             Scribe_Values.Look(ref weight, "weight", 1);
+            Scribe_Values.Look(ref timeoutSeconds, "timeoutSeconds", 60);
             Scribe_Values.Look(ref isEnabled, "isEnabled", true);
         }
 
