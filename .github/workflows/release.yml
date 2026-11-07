@@ -82,18 +82,28 @@ jobs:
             const base = '${{ steps.git-range.outputs.base }}';
             const head = '${{ steps.git-range.outputs.current }}';
 
-            const compareOptions = {
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              head: head
-            };
-            if (base) compareOptions.base = base;
-
-            const { data: compare } = await github.rest.repos.compareCommits(compareOptions);
-            console.log(`::notice::共检测到 ${compare.commits.length} 个 Commits`);
+            let commits = [];
+            if (base) {
+              const { data: compare } = await github.rest.repos.compareCommits({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                base: base,
+                head: head
+              });
+              commits = compare.commits;
+            } else {
+              const { data: list } = await github.rest.repos.listCommits({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                sha: head,
+                per_page: 100
+              });
+              commits = list;
+            }
+            console.log(`::notice::共检测到 ${commits.length} 个 Commits`);
 
             const prNumbers = new Set();
-            for (const commit of compare.commits) {
+            for (const commit of commits) {
               const message = commit.commit.message;
               const mergeMatch = message.match(/Merge pull request #(\d+)/);
               if (mergeMatch) prNumbers.add(parseInt(mergeMatch[1]));
