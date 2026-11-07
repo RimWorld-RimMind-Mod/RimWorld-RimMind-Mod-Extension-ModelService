@@ -4,6 +4,7 @@ using System.Net.Http;
 using System.Threading;
 using System.Threading.Tasks;
 using RimMind.ModelService.Models;
+using RimMind.ModelService.Protocol;
 using RimMind.ModelService.Security;
 
 namespace RimMind.ModelService.Diagnostics
@@ -18,17 +19,25 @@ namespace RimMind.ModelService.Diagnostics
             Timeout = TimeSpan.FromSeconds(15)
         };
 
-        public static async Task<(bool success, int latencyMs, string message)> ProbeEndpointAsync(
+        public static Task<(bool success, int latencyMs, string message)> ProbeEndpointAsync(
             ModelEndpointConfig endpoint,
             CancellationToken ct = default)
+            => ProbeEndpointAsync(endpoint, ct, null);
+
+        internal static async Task<(bool success, int latencyMs, string message)> ProbeEndpointAsync(
+            ModelEndpointConfig endpoint,
+            CancellationToken ct,
+            Func<HttpRequestMessage, CancellationToken, Task<HttpResponseMessage>>? httpSendOverride)
         {
             if (endpoint == null || string.IsNullOrWhiteSpace(endpoint.endpoint))
             {
                 return (false, -1, "Invalid or empty endpoint URL");
             }
 
+            var protocol = ModelProtocolRegistry.Resolve(endpoint);
+
             // Security check for local subscription gateway
-            if (endpoint.providerType == ProviderType.LocalSubscriptionGateway)
+            if (protocol.LegacyProviderType == ProviderType.LocalSubscriptionGateway)
             {
                 if (!LocalLoopbackValidator.IsLoopbackAddress(endpoint.endpoint))
                 {
@@ -36,30 +45,15 @@ namespace RimMind.ModelService.Diagnostics
                 }
             }
 
+            var sendAsync = httpSendOverride
+                ?? ((req, token) => HttpClient.SendAsync(req, HttpCompletionOption.ResponseHeadersRead, token));
+
             var stopwatch = Stopwatch.StartNew();
             try
             {
-                using var request = new HttpRequestMessage(HttpMethod.Get, endpoint.endpoint.TrimEnd('/') + "/models");
-                if (!string.IsNullOrEmpty(endpoint.apiKey))
-                {
-                    if (endpoint.providerType == ProviderType.AnthropicClaude)
-                    {
-                        request.Headers.TryAddWithoutValidation("x-api-key", endpoint.apiKey);
-                        request.Headers.TryAddWithoutValidation("anthropic-version", "2023-06-01");
-                    }
-                    else
-                    {
-                        request.Headers.TryAddWithoutValidation("Authorization", "Bearer " + endpoint.apiKey);
-                    }
-                }
-                if (endpoint.providerType == ProviderType.OpenCodeGo
-                    || (!string.IsNullOrEmpty(endpoint.endpoint) && endpoint.endpoint.IndexOf("opencode", StringComparison.OrdinalIgnoreCase) >= 0)
-                    || (!string.IsNullOrEmpty(endpoint.apiKey) && endpoint.apiKey.StartsWith("oc_sk_", StringComparison.OrdinalIgnoreCase)))
-                {
-                    request.Headers.TryAddWithoutValidation("x-opencode-session", "rimmind-health-probe");
-                }
-
-                using var response = await HttpClient.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, ct).ConfigureAwait(false);
+                string resolvedUrl = endpoint.endpoint.TrimEnd('/') + "/models";
+                using var request = protocol.BuildHealthProbeRequest(endpoint, resolvedUrl);
+                using var response = await sendAsync(request, ct).ConfigureAwait(false);
                 stopwatch.Stop();
                 int latency = (int)stopwatch.ElapsedMilliseconds;
 
@@ -84,7 +78,7 @@ namespace RimMind.ModelService.Diagnostics
                 {
                     endpoint.lastLatencyMs = latency;
                     endpoint.isHealthy = false;
-                    return (false, latency, $"HTTP {statusCode} {response.ReasonPhrase}");
+                    return (false, latency, $"HTTP {statusCode} {SecretRedactor.ForMessageWithSecret(response.ReasonPhrase, endpoint.apiKey)}");
                 }
             }
             catch (Exception ex)
@@ -92,7 +86,8 @@ namespace RimMind.ModelService.Diagnostics
                 stopwatch.Stop();
                 endpoint.lastLatencyMs = -1;
                 endpoint.isHealthy = false;
-                return (false, -1, ex.Message);
+                // The probe message is shown in the settings UI / debug log: never echo raw exception text.
+                return (false, -1, SecretRedactor.ForMessageWithSecret(ex.Message, endpoint.apiKey));
             }
         }
     }

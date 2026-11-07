@@ -38,6 +38,8 @@ namespace RimMind.ModelService
         {
             try
             {
+                ModelServiceClientFactory.RegisterDescriptor();
+
                 var factoryRegistry = RimMindAPI.Ext.Get<IAIClientFactory>();
                 if (factoryRegistry != null)
                 {

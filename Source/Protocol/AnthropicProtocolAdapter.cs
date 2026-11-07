@@ -8,6 +8,7 @@ using RimMind.Domain.Common;
 using RimMind.Domain.Llm;
 using RimMind.Domain.ValueObjects;
 using RimMind.ModelService.Models;
+using RimMind.ModelService.Security;
 
 namespace RimMind.ModelService.Protocol
 {
@@ -47,8 +48,14 @@ namespace RimMind.ModelService.Protocol
             var messagesArray = new JArray();
             if (envelope.Messages != null && envelope.Messages.Count > 0)
             {
-                var nonSystemMessages = envelope.Messages.Where(m => m.Role != "system").ToList();
-                var lastUserMsgRef = nonSystemMessages.LastOrDefault(m => m.Role == "user");
+                var liveMessages = envelope.Messages.Where(m => m != null && m.Role != "system").ToList();
+                var lastUserMsgRef = liveMessages.LastOrDefault(m => m.Role == "user");
+
+                // Few-shot examples precede the live conversation (same placement as Core's OpenAI serializer).
+                var nonSystemMessages = new List<ChatMessage>();
+                if (envelope.Examples != null)
+                    nonSystemMessages.AddRange(envelope.Examples.Where(ex => ex != null && ex.Role != "system"));
+                nonSystemMessages.AddRange(liveMessages);
 
                 JObject? lastUserMsg = null;
                 foreach (var msg in nonSystemMessages)
@@ -152,7 +159,9 @@ namespace RimMind.ModelService.Protocol
                     var tool = sortedTools[i];
                     var toolObj = new JObject
                     {
-                        ["name"] = tool.Name,
+                        // Anthropic tool names must match ^[a-zA-Z0-9_-]{1,64}$; Core's ToolRegistry
+                        // resolves the underscore form back to the dotted tool id.
+                        ["name"] = tool.Name?.Replace('.', '_') ?? "",
                         ["description"] = tool.Description ?? ""
                     };
 
@@ -181,6 +190,10 @@ namespace RimMind.ModelService.Protocol
                     toolsArray.Add(toolObj);
                 }
                 root["tools"] = toolsArray;
+
+                // Mirror Core's tool_choice=required semantics ("any" = must call at least one tool).
+                if (envelope.Tools.Any(t => t.ToolChoice == "required"))
+                    root["tool_choice"] = new JObject { ["type"] = "any" };
             }
 
             return root.ToString(Formatting.None);
@@ -198,13 +211,13 @@ namespace RimMind.ModelService.Protocol
                 if (token["type"]?.ToString() == "error" || token["error"] != null)
                 {
                     string msg = token["error"]?["message"]?.ToString() ?? "Unknown Anthropic error";
-                    return Result<LlmResponse, RimMindError>.Err(RimMindErrors.ClientPermanent(msg));
+                    return Result<LlmResponse, RimMindError>.Err(RimMindErrors.ClientPermanent(SecretRedactor.ForMessage(msg)));
                 }
 
                 var contentArray = token["content"] as JArray;
                 var textBuilder = new StringBuilder();
                 var reasoningBuilder = new StringBuilder();
-                string toolCallsJson = "";
+                string? toolCallsJson = null;
 
                 if (contentArray != null)
                 {
@@ -264,7 +277,7 @@ namespace RimMind.ModelService.Protocol
             catch (Exception ex)
             {
                 return Result<LlmResponse, RimMindError>.Err(
-                    RimMindErrors.ClientPermanent($"Failed to parse Anthropic response: {ex.Message}"));
+                    RimMindErrors.ClientPermanent($"Failed to parse Anthropic response: {SecretRedactor.ForMessage(ex.Message)}"));
             }
         }
     }

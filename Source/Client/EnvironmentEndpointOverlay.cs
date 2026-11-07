@@ -2,6 +2,7 @@ using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using RimMind.ModelService.Models;
+using RimMind.ModelService.Protocol;
 
 namespace RimMind.ModelService.Client
 {
@@ -64,7 +65,8 @@ namespace RimMind.ModelService.Client
             {
                 if (ep == null)
                     continue;
-                if (!string.IsNullOrEmpty(ep.apiKey) || ep.providerType != ProviderType.OpenCodeGo)
+                if (!string.IsNullOrEmpty(ep.apiKey)
+                    || !string.Equals(ep.EffectiveProtocolId, ModelProtocolRegistry.OpenCodeGoProtocolId, StringComparison.OrdinalIgnoreCase))
                 {
                     result.Add(ep);
                     continue;
@@ -74,8 +76,10 @@ namespace RimMind.ModelService.Client
                 shadow.id = ep.id ?? string.Empty;
                 shadow.name = ep.name;
                 shadow.providerType = ep.providerType;
+                shadow.protocolId = ep.EffectiveProtocolId;
                 shadow.priority = ep.priority;
                 shadow.weight = ep.weight;
+                shadow.timeoutSeconds = ep.timeoutSeconds;
                 shadow.isEnabled = ep.isEnabled;
                 shadow.apiKey = _apiKey;
                 shadow.endpoint = string.IsNullOrEmpty(_endpoint) ? ep.endpoint : _endpoint!;

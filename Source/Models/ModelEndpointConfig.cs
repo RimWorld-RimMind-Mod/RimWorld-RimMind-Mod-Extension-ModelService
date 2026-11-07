@@ -1,5 +1,6 @@
 using System;
 using System.Threading;
+using RimMind.ModelService.Protocol;
 using Verse;
 
 namespace RimMind.ModelService.Models
@@ -8,7 +9,78 @@ namespace RimMind.ModelService.Models
     {
         public string id = Guid.NewGuid().ToString("N");
         public string name = "Default Node";
-        public ProviderType providerType = ProviderType.OpenAICompatible;
+
+        private ProviderType _providerType = ProviderType.OpenAICompatible;
+        private string _protocolId = "";
+
+        public ProviderType providerType
+        {
+            get => _providerType;
+            set
+            {
+                _providerType = value;
+                if (string.IsNullOrWhiteSpace(_protocolId) || ModelProtocolRegistry.TryGetBuiltInProviderType(_protocolId, out _))
+                {
+                    _protocolId = ModelProtocolRegistry.ToProtocolId(value);
+                }
+                else if (ModelProtocolRegistry.TryGet(_protocolId, out var customProto) && customProto.LegacyProviderType != value)
+                {
+                    _protocolId = ModelProtocolRegistry.ToProtocolId(value);
+                }
+                else if (value != ProviderType.OpenAICompatible)
+                {
+                    _protocolId = ModelProtocolRegistry.ToProtocolId(value);
+                }
+            }
+        }
+
+        public string protocolId
+        {
+            get => _protocolId;
+            set
+            {
+                if (string.IsNullOrWhiteSpace(value))
+                {
+                    _protocolId = string.Empty;
+                    return;
+                }
+
+                string trimmed = value.Trim();
+                if (ModelProtocolRegistry.TryGetBuiltInProviderType(trimmed, out var builtInType))
+                {
+                    _providerType = builtInType;
+                    _protocolId = ModelProtocolRegistry.ToProtocolId(builtInType);
+                }
+                else
+                {
+                    _protocolId = trimmed;
+                    if (ModelProtocolRegistry.TryGet(trimmed, out var customProto))
+                    {
+                        _providerType = customProto.LegacyProviderType;
+                    }
+                }
+            }
+        }
+
+        public string EffectiveProtocolId
+        {
+            get
+            {
+                if (!string.IsNullOrWhiteSpace(_protocolId))
+                {
+                    string trimmed = _protocolId.Trim();
+                    if (ModelProtocolRegistry.TryGetBuiltInProviderType(trimmed, out var builtInType))
+                    {
+                        return builtInType == _providerType
+                            ? ModelProtocolRegistry.ToProtocolId(builtInType)
+                            : ModelProtocolRegistry.ToProtocolId(_providerType);
+                    }
+                    return trimmed;
+                }
+                return ModelProtocolRegistry.ToProtocolId(_providerType);
+            }
+        }
+
         public string endpoint = "https://api.openai.com/v1";
         public string apiKey = "";
         public string modelName = "gpt-4o-mini";
@@ -84,11 +156,54 @@ namespace RimMind.ModelService.Models
             }
         }
 
+        public void SynchronizeProtocol()
+        {
+            if (string.IsNullOrWhiteSpace(_protocolId))
+            {
+                _protocolId = ModelProtocolRegistry.ToProtocolId(_providerType);
+                return;
+            }
+
+            string trimmed = _protocolId.Trim();
+            if (ModelProtocolRegistry.TryGetBuiltInProviderType(trimmed, out var builtInType))
+            {
+                if (builtInType != _providerType)
+                {
+                    if (_providerType != ProviderType.OpenAICompatible && builtInType == ProviderType.OpenAICompatible)
+                    {
+                        _protocolId = ModelProtocolRegistry.ToProtocolId(_providerType);
+                    }
+                    else
+                    {
+                        _providerType = builtInType;
+                        _protocolId = ModelProtocolRegistry.ToProtocolId(builtInType);
+                    }
+                }
+                else
+                {
+                    _protocolId = ModelProtocolRegistry.ToProtocolId(builtInType);
+                }
+                return;
+            }
+
+            _protocolId = trimmed;
+            if (ModelProtocolRegistry.TryGet(trimmed, out var customProto))
+            {
+                _providerType = customProto.LegacyProviderType;
+            }
+        }
+
         public void ExposeData()
         {
+            if (Scribe.mode == LoadSaveMode.Saving)
+            {
+                SynchronizeProtocol();
+            }
+
             Scribe_Values.Look(ref id, "id", Guid.NewGuid().ToString("N"));
             Scribe_Values.Look(ref name, "name", "Default Node");
-            Scribe_Values.Look(ref providerType, "providerType", ProviderType.OpenAICompatible);
+            Scribe_Values.Look(ref _providerType, "providerType", ProviderType.OpenAICompatible);
+            Scribe_Values.Look(ref _protocolId, "protocolId", "");
             Scribe_Values.Look(ref endpoint, "endpoint", "https://api.openai.com/v1");
             Scribe_Values.Look(ref apiKey, "apiKey", "");
             Scribe_Values.Look(ref modelName, "modelName", "gpt-4o-mini");
@@ -96,6 +211,8 @@ namespace RimMind.ModelService.Models
             Scribe_Values.Look(ref weight, "weight", 1);
             Scribe_Values.Look(ref timeoutSeconds, "timeoutSeconds", 60);
             Scribe_Values.Look(ref isEnabled, "isEnabled", true);
+
+            SynchronizeProtocol();
         }
 
         public static ModelEndpointConfig CreateCodexGatewayPreset(int priority = 0) =>

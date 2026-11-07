@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Threading.Tasks;
 using RimMind.ModelService.Diagnostics;
 using RimMind.ModelService.Models;
+using RimMind.ModelService.Protocol;
 using RimMind.ModelService.Security;
 using RimMind.Presentation.UI;
 using UnityEngine;
@@ -97,12 +98,14 @@ namespace RimMind.ModelService.Settings
             {
                 lock (settings.EndpointSyncRoot)
                 {
+                    var defaultProtocol = ModelProtocolRegistry.Resolve(ModelProtocolRegistry.OpenAIProtocolId);
                     settings.endpoints.Add(new ModelEndpointConfig
                     {
                         name = $"Node {settings.endpoints.Count + 1}",
                         endpoint = "http://127.0.0.1:8000/v1",
-                        modelName = "gpt-4o-mini",
-                        providerType = ProviderType.OpenAICompatible,
+                        modelName = defaultProtocol.DefaultModel,
+                        providerType = defaultProtocol.LegacyProviderType,
+                        protocolId = defaultProtocol.ProtocolId,
                         priority = settings.endpoints.Count,
                         weight = 1,
                         isEnabled = true
@@ -219,28 +222,22 @@ namespace RimMind.ModelService.Settings
                     GUI.color = Color.white;
                 }
 
-                // --- Row 2: Provider selection button (FloatMenu), URL text field ---
+                // --- Row 2: Protocol selection button (FloatMenu), URL text field ---
                 float row2Y = cardRect.y + 42f;
 
-                string providerLabel = endpoint.providerType switch
-                {
-                    ProviderType.OpenAICompatible => "RimMind.ModelService.Provider.OpenAICompatible".Translate(),
-                    ProviderType.AnthropicClaude => "RimMind.ModelService.Provider.AnthropicClaude".Translate(),
-                    ProviderType.LocalSubscriptionGateway => "RimMind.ModelService.Provider.LocalSubscriptionGateway".Translate(),
-                    ProviderType.OpenCodeGo => "RimMind.ModelService.Provider.OpenCodeGo".Translate(),
-                    _ => endpoint.providerType.ToString()
-                };
+                var currentProtocol = ModelProtocolRegistry.Resolve(endpoint);
+                string providerLabel = GetProtocolDisplayLabel(currentProtocol);
 
                 var provRect = new Rect(leftX, row2Y, 210f, 26f);
                 if (Widgets.ButtonText(provRect, providerLabel))
                 {
-                    var options = new List<FloatMenuOption>
+                    var options = new List<FloatMenuOption>();
+                    foreach (var protocol in ModelProtocolRegistry.All)
                     {
-                        new FloatMenuOption("RimMind.ModelService.Provider.OpenAICompatible".Translate(), () => endpoint.providerType = ProviderType.OpenAICompatible),
-                        new FloatMenuOption("RimMind.ModelService.Provider.AnthropicClaude".Translate(), () => endpoint.providerType = ProviderType.AnthropicClaude),
-                        new FloatMenuOption("RimMind.ModelService.Provider.LocalSubscriptionGateway".Translate(), () => endpoint.providerType = ProviderType.LocalSubscriptionGateway),
-                        new FloatMenuOption("RimMind.ModelService.Provider.OpenCodeGo".Translate(), () => endpoint.providerType = ProviderType.OpenCodeGo)
-                    };
+                        var capturedProtocol = protocol;
+                        string optionLabel = GetProtocolDisplayLabel(capturedProtocol);
+                        options.Add(new FloatMenuOption(optionLabel, () => ApplyProtocolSelection(endpoint, capturedProtocol)));
+                    }
                     Find.WindowStack.Add(new FloatMenu(options));
                 }
                 TooltipHandler.TipRegion(provRect, providerLabel);
@@ -349,7 +346,7 @@ namespace RimMind.ModelService.Settings
                 TooltipHandler.TipRegion(statusRect, $"{statusIcon} {latencyStr} ({statusDetail})");
 
                 // Security Banner (if LocalSubscriptionGateway: 🛡️ 本地回环安全锁定 if loopback, or ⚠️ 凭据安全拦截 if not loopback)
-                if (endpoint.providerType == ProviderType.LocalSubscriptionGateway)
+                if (currentProtocol.LegacyProviderType == ProviderType.LocalSubscriptionGateway)
                 {
                     bool isLoopback = endpoint.IsLoopbackAddress;
                     string bannerText = isLoopback
@@ -370,7 +367,7 @@ namespace RimMind.ModelService.Settings
                         : "RimMind.ModelService.Security.LoopbackViolation".Translate();
                     TooltipHandler.TipRegion(bannerRect, tip);
                 }
-                else if (endpoint.providerType == ProviderType.OpenCodeGo)
+                else if (string.Equals(currentProtocol.ProtocolId, ModelProtocolRegistry.OpenCodeGoProtocolId, StringComparison.OrdinalIgnoreCase))
                 {
                     string bannerText = "RimMind.ModelService.Security.OpenCodeGoSessionRouted".Translate();
                     float bannerX = statusX + 165f;
@@ -415,6 +412,40 @@ namespace RimMind.ModelService.Settings
 
             Widgets.EndScrollView();
             listing.End();
+        }
+
+        internal static string GetProtocolDisplayLabel(IModelProtocol protocol)
+        {
+            if (protocol == null) return string.Empty;
+            if (!string.IsNullOrEmpty(protocol.DisplayLabelKey) && protocol.DisplayLabelKey.CanTranslate())
+            {
+                return protocol.DisplayLabelKey.Translate();
+            }
+            return !string.IsNullOrEmpty(protocol.FallbackLabel) ? protocol.FallbackLabel : protocol.ProtocolId;
+        }
+
+        internal static void ApplyProtocolSelection(ModelEndpointConfig endpoint, IModelProtocol selectedProtocol)
+        {
+            if (endpoint == null || selectedProtocol == null) return;
+
+            var previousProtocol = ModelProtocolRegistry.Resolve(endpoint);
+            bool updateUrl = string.IsNullOrWhiteSpace(endpoint.endpoint)
+                || string.Equals(endpoint.endpoint, previousProtocol.DefaultEndpointUrl, StringComparison.OrdinalIgnoreCase);
+            bool updateModel = string.IsNullOrWhiteSpace(endpoint.modelName)
+                || string.Equals(endpoint.modelName, previousProtocol.DefaultModel, StringComparison.OrdinalIgnoreCase);
+
+            endpoint.protocolId = selectedProtocol.ProtocolId;
+            endpoint.providerType = selectedProtocol.LegacyProviderType;
+
+            if (updateUrl && !string.IsNullOrWhiteSpace(selectedProtocol.DefaultEndpointUrl))
+            {
+                endpoint.endpoint = selectedProtocol.DefaultEndpointUrl;
+            }
+
+            if (updateModel && !string.IsNullOrWhiteSpace(selectedProtocol.DefaultModel))
+            {
+                endpoint.modelName = selectedProtocol.DefaultModel;
+            }
         }
 
         private static void SyncPriorities(List<ModelEndpointConfig> endpoints)

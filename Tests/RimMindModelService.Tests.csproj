@@ -33,13 +33,24 @@
     <Compile Include="../Source/Client/EnvironmentEndpointOverlay.cs" />
     <Compile Include="../Source/Settings/ModelServiceSettings.cs" />
     <Compile Include="../Source/Security/LocalLoopbackValidator.cs" />
+    <Compile Include="../Source/Security/SecretRedactor.cs" />
     <Compile Include="../Source/Balancing/LoadBalancer.cs" />
+    <Compile Include="../Source/Protocol/IModelProtocol.cs" />
+    <Compile Include="../Source/Protocol/ModelProtocolRegistry.cs" />
     <Compile Include="../Source/Protocol/OpenAIProtocolAdapter.cs" />
     <Compile Include="../Source/Protocol/AnthropicProtocolAdapter.cs" />
     <Compile Include="../Source/Client/ModelServiceClient.cs" />
     <Compile Include="../Source/Client/ModelServiceClientFactory.cs" />
     <Compile Include="../Source/Client/OpenCodeGoClientFactory.cs" />
     <Compile Include="../Source/Diagnostics/EndpointHealthProbe.cs" />
+  </ItemGroup>
+
+  <!-- Test-only links to Core's internal OpenAI serializer and log sanitizer: the parity contracts
+       compare ModelService's wire output against Core's directly so the two cannot drift. -->
+  <ItemGroup>
+    <Compile Include="../../RimMind-Core/Source/Infrastructure/Services/Clients/OpenAI/MessageDto.cs" Link="CoreParity\MessageDto.cs" />
+    <Compile Include="../../RimMind-Core/Source/Infrastructure/Services/Clients/OpenAI/OpenAIRequestSerializer.cs" Link="CoreParity\OpenAIRequestSerializer.cs" />
+    <Compile Include="../../RimMind-Core/Source/Infrastructure/Services/Clients/Shared/LogSanitizer.cs" Link="CoreParity\LogSanitizer.cs" />
   </ItemGroup>
 
 </Project>
