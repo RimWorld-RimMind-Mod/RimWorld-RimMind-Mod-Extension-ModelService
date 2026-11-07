@@ -1,31 +1,31 @@
 using System;
+using RimMind.ModelService.Protocol;
 
 namespace RimMind.ModelService.Models
 {
     public static class ModelEndpointPresets
     {
-        public static ModelEndpointConfig CreateCodexGatewayPreset(int priority = 0) => new ModelEndpointConfig
+        public static ModelEndpointConfig CreatePreset(string protocolId, string? displayName = null, int priority = 0)
         {
-            id = Guid.NewGuid().ToString("N"),
-            name = "Codex Local Gateway (sub2api)",
-            endpoint = "http://127.0.0.1:8000/v1",
-            modelName = "gpt-4o",
-            providerType = ProviderType.LocalSubscriptionGateway,
-            isEnabled = true,
-            priority = priority,
-            weight = 1
-        };
+            var protocol = ModelProtocolRegistry.Resolve(protocolId);
+            return new ModelEndpointConfig
+            {
+                id = Guid.NewGuid().ToString("N"),
+                name = !string.IsNullOrWhiteSpace(displayName) ? displayName! : protocol.FallbackLabel,
+                endpoint = protocol.DefaultEndpointUrl,
+                modelName = protocol.DefaultModel,
+                providerType = protocol.LegacyProviderType,
+                protocolId = protocol.ProtocolId,
+                isEnabled = true,
+                priority = priority,
+                weight = 1
+            };
+        }
 
-        public static ModelEndpointConfig CreateOpenCodeGoPreset(int priority = 1) => new ModelEndpointConfig
-        {
-            id = Guid.NewGuid().ToString("N"),
-            name = "OpenCode Go (Direct)",
-            endpoint = "https://opencode.ai/zen/go/v1",
-            modelName = "deepseek-v4.1-flash",
-            providerType = ProviderType.OpenCodeGo,
-            isEnabled = true,
-            priority = priority,
-            weight = 1
-        };
+        public static ModelEndpointConfig CreateCodexGatewayPreset(int priority = 0) =>
+            CreatePreset(ModelProtocolRegistry.LocalGatewayProtocolId, "Codex Local Gateway (sub2api)", priority);
+
+        public static ModelEndpointConfig CreateOpenCodeGoPreset(int priority = 1) =>
+            CreatePreset(ModelProtocolRegistry.OpenCodeGoProtocolId, "OpenCode Go (Direct)", priority);
     }
 }

@@ -4,7 +4,6 @@ using System.Diagnostics;
 using System.Linq;
 using System.Net.Http;
 using System.Text;
-using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
 using RimMind.Application.Common.Interfaces.Client;
@@ -23,10 +22,6 @@ namespace RimMind.ModelService.Client
     {
         private const int MaxErrorBodyChars = 500;
         private const int DefaultOverallTimeoutSeconds = 180;
-
-        private static readonly Regex SecretRedactionRegex = new Regex(
-            @"(?i)(?:Bearer\s+[A-Za-z0-9\-\._~\+\/=]{4,}|\b(?:sk|oc_sk|sk-ant|sk-proj)[\-_][A-Za-z0-9\-_]{8,})",
-            RegexOptions.Compiled);
 
         private static readonly HttpClient HttpClient = new HttpClient(new HttpClientHandler
         {
@@ -67,13 +62,12 @@ namespace RimMind.ModelService.Client
             _clockMs = clockMsOverride ?? (() => DateTimeOffset.UtcNow.ToUnixTimeMilliseconds());
         }
 
-        private static string SanitizeAndTruncate(string? text, int maxChars = MaxErrorBodyChars)
+        // Redaction patterns are shared with Core's LogSanitizer via SecretRedactor (parity-tested);
+        // the node's own configured key is masked literally as well, whatever its shape.
+        private static string SanitizeAndTruncate(string? text, string? knownSecret, int maxChars = MaxErrorBodyChars)
         {
             if (string.IsNullOrEmpty(text)) return string.Empty;
-            string redacted = SecretRedactionRegex.Replace(text!, "***");
-            if (maxChars > 0 && redacted.Length > maxChars)
-                return redacted.Substring(0, maxChars) + $"…[truncated {redacted.Length - maxChars} chars]";
-            return redacted;
+            return SecretRedactor.ForMessageWithSecret(text, knownSecret, maxChars);
         }
 
         private static bool IsTransientError(RimMindError error) =>
@@ -174,7 +168,8 @@ namespace RimMind.ModelService.Client
 
                 triedEndpoints.Add(node.id);
 
-                if (node.providerType == ProviderType.LocalSubscriptionGateway && !node.IsLoopbackAddress)
+                var protocol = ModelProtocolRegistry.Resolve(node);
+                if (protocol.LegacyProviderType == ProviderType.LocalSubscriptionGateway && !node.IsLoopbackAddress)
                 {
                     long failTick = _clockMs();
                     node.RecordFailure(failTick);
@@ -184,7 +179,7 @@ namespace RimMind.ModelService.Client
                     continue;
                 }
 
-                var result = await TrySendToNodeAsync(envelope, node, overallToken, callerToken).ConfigureAwait(false);
+                var result = await TrySendToNodeAsync(envelope, node, protocol, overallToken, callerToken).ConfigureAwait(false);
                 if (result.IsOk)
                 {
                     return result;
@@ -233,6 +228,7 @@ namespace RimMind.ModelService.Client
         private async Task<Result<LlmResponse, RimMindError>> TrySendToNodeAsync(
             LlmRequestEnvelope envelope,
             ModelEndpointConfig node,
+            IModelProtocol protocol,
             CancellationToken overallToken,
             CancellationToken callerToken)
         {
@@ -242,54 +238,19 @@ namespace RimMind.ModelService.Client
             var stopwatch = Stopwatch.StartNew();
             try
             {
-                string requestUrl;
-                string payloadJson;
-                using var request = new HttpRequestMessage(HttpMethod.Post, "");
-
-                if (node.providerType == ProviderType.AnthropicClaude)
+                string modelOverride = !string.IsNullOrEmpty(node.modelName) ? node.modelName : protocol.DefaultModel;
+                var payloadResult = protocol.BuildRequestJson(envelope, modelOverride);
+                if (payloadResult.IsErr)
                 {
-                    requestUrl = node.endpoint.TrimEnd('/') + "/messages";
-                    payloadJson = AnthropicProtocolAdapter.BuildRequestJson(envelope, node);
-
-                    request.RequestUri = new Uri(requestUrl);
-                    request.Headers.TryAddWithoutValidation("x-api-key", node.apiKey);
-                    request.Headers.TryAddWithoutValidation("anthropic-version", "2023-06-01");
-                }
-                else if (node.providerType == ProviderType.OpenCodeGo)
-                {
-                    requestUrl = node.endpoint.TrimEnd('/') + "/chat/completions";
-                    payloadJson = OpenAIProtocolAdapter.BuildRequestJson(envelope, node);
-
-                    request.RequestUri = new Uri(requestUrl);
-                    if (!string.IsNullOrEmpty(node.apiKey))
-                    {
-                        request.Headers.TryAddWithoutValidation("Authorization", "Bearer " + node.apiKey);
-                    }
-                    string sessionGuid = !string.IsNullOrEmpty(envelope.NpcId)
-                        ? envelope.NpcId!
-                        : (!string.IsNullOrEmpty(envelope.RequestId)
-                            ? envelope.RequestId!
-                            : Guid.NewGuid().ToString("N").Substring(0, 16));
-                    request.Headers.TryAddWithoutValidation("x-opencode-session", "rimmind-" + sessionGuid);
-                }
-                else // OpenAICompatible or LocalSubscriptionGateway
-                {
-                    requestUrl = node.endpoint.TrimEnd('/') + "/chat/completions";
-                    payloadJson = OpenAIProtocolAdapter.BuildRequestJson(envelope, node);
-
-                    request.RequestUri = new Uri(requestUrl);
-                    if (!string.IsNullOrEmpty(node.apiKey))
-                    {
-                        request.Headers.TryAddWithoutValidation("Authorization", "Bearer " + node.apiKey);
-                    }
-                    if (!string.IsNullOrEmpty(requestUrl) && (requestUrl.IndexOf("opencode", StringComparison.OrdinalIgnoreCase) >= 0 || (!string.IsNullOrEmpty(node.apiKey) && node.apiKey.IndexOf("oc_sk_", StringComparison.OrdinalIgnoreCase) >= 0)))
-                    {
-                        string fallbackSession = !string.IsNullOrEmpty(envelope.NpcId) ? envelope.NpcId! : Guid.NewGuid().ToString("N").Substring(0, 12);
-                        request.Headers.TryAddWithoutValidation("x-opencode-session", "rimmind-" + fallbackSession);
-                    }
+                    return Result<LlmResponse, RimMindError>.Err(payloadResult.Error);
                 }
 
-                using var content = new StringContent(payloadJson, Encoding.UTF8, "application/json");
+                string defaultRequestUrl = node.endpoint.TrimEnd('/') + "/chat/completions";
+                using var request = new HttpRequestMessage(HttpMethod.Post, defaultRequestUrl);
+                string? sessionKey = !string.IsNullOrEmpty(envelope.NpcId) ? envelope.NpcId : envelope.RequestId;
+                protocol.ApplyHeaders(request, node, sessionKey);
+
+                using var content = new StringContent(payloadResult.Value, Encoding.UTF8, "application/json");
                 request.Content = content;
 
                 using var response = await _httpSend(request, linkedCts.Token).ConfigureAwait(false);
@@ -299,7 +260,7 @@ namespace RimMind.ModelService.Client
                 if (!response.IsSuccessStatusCode)
                 {
                     int statusCode = (int)response.StatusCode;
-                    string safeBody = SanitizeAndTruncate(responseBody);
+                    string safeBody = SanitizeAndTruncate(responseBody, node.apiKey);
                     string errMsg = $"Node '{node.name}' HTTP {statusCode}: {safeBody}";
                     return Result<LlmResponse, RimMindError>.Err(
                         (statusCode == 429 || statusCode >= 500 || statusCode == 408)
@@ -307,21 +268,14 @@ namespace RimMind.ModelService.Client
                             : RimMindErrors.ClientPermanent(errMsg));
                 }
 
-                Result<LlmResponse, RimMindError> parseResult;
-                if (node.providerType == ProviderType.AnthropicClaude)
-                {
-                    parseResult = AnthropicProtocolAdapter.ParseResponse(responseBody);
-                }
-                else
-                {
-                    parseResult = OpenAIProtocolAdapter.ParseResponse(responseBody);
-                }
-
+                var parseResult = protocol.ParseResponse(responseBody, envelope);
                 if (parseResult.IsOk)
                 {
                     node.RecordSuccess((int)stopwatch.ElapsedMilliseconds);
                     var val = parseResult.Value;
-                    string reqId = string.IsNullOrEmpty(val.RequestId) ? envelope.RequestId : val.RequestId;
+                    // Like Core's OpenAIClient, responses are correlated by the envelope's RequestId;
+                    // the provider's own completion id is only a fallback for id-less envelopes.
+                    string reqId = !string.IsNullOrEmpty(envelope.RequestId) ? envelope.RequestId : val.RequestId;
                     val = val.With(requestId: reqId, state: AIRequestState.Completed);
                     parseResult = Result<LlmResponse, RimMindError>.Ok(val);
                 }
@@ -342,7 +296,7 @@ namespace RimMind.ModelService.Client
             {
                 stopwatch.Stop();
                 return Result<LlmResponse, RimMindError>.Err(
-                    RimMindErrors.ClientTransient($"Failed to reach node '{node.name}': {SanitizeAndTruncate(ex.Message)}", ex));
+                    RimMindErrors.ClientTransient($"Failed to reach node '{node.name}': {SanitizeAndTruncate(ex.Message, node.apiKey)}", ex));
             }
         }
 

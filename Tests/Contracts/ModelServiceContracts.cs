@@ -979,6 +979,267 @@ namespace RimMind.ModelService.Tests.Contracts
             }
         }
 
+        [Fact]
+        public async Task ModelProtocolRegistry_custom_protocol_works_end_to_end_through_client_and_health_probe()
+        {
+            var customProtocol = new CustomGeminiNativeProtocol();
+            ModelProtocolRegistry.Register(customProtocol);
+            try
+            {
+                Assert.Contains(ModelProtocolRegistry.All, p => p.ProtocolId == "gemini_native");
+                Assert.Same(customProtocol, ModelProtocolRegistry.Resolve("GEMINI_NATIVE"));
+
+                var endpoint = new ModelEndpointConfig
+                {
+                    id = "gemini-node-1",
+                    name = "Gemini Native Node",
+                    endpoint = "https://generativelanguage.googleapis.com/v1beta",
+                    modelName = "",
+                    apiKey = "gkey_test_12345",
+                    protocolId = "gemini_native",
+                    isEnabled = true
+                };
+
+                Assert.Equal("gemini_native", endpoint.EffectiveProtocolId);
+                Assert.Same(customProtocol, ModelProtocolRegistry.Resolve(endpoint));
+
+                System.Net.Http.HttpRequestMessage? capturedClientRequest = null;
+                string? capturedClientPayload = null;
+
+                using (var client = new ModelServiceClient(
+                    () => new List<ModelEndpointConfig> { endpoint },
+                    () => BalancingStrategy.PriorityFailover,
+                    loadBalancer: null,
+                    httpSendOverride: async (req, _) =>
+                    {
+                        capturedClientRequest = new System.Net.Http.HttpRequestMessage(req.Method, req.RequestUri);
+                        foreach (var header in req.Headers)
+                        {
+                            capturedClientRequest.Headers.TryAddWithoutValidation(header.Key, header.Value);
+                        }
+                        capturedClientPayload = req.Content != null ? await req.Content.ReadAsStringAsync() : null;
+                        return new System.Net.Http.HttpResponseMessage(System.Net.HttpStatusCode.OK)
+                        {
+                            Content = new System.Net.Http.StringContent(
+                                "{\"candidates\":[{\"text\":\"Gemini native reply\"}],\"tokens\":77}",
+                                System.Text.Encoding.UTF8,
+                                "application/json")
+                        };
+                    }))
+                {
+                    var envelope = new LlmRequestEnvelope
+                    {
+                        RequestId = "req-gemini-e2e",
+                        Messages = new List<ChatMessage>
+                        {
+                            new ChatMessage { Role = "user", Content = "Ping Gemini" }
+                        }
+                    };
+
+                    var response = await client.SendAsync(envelope);
+                    Assert.True(response.IsOk);
+                    Assert.Equal("Gemini native reply", response.Value.Content);
+                    Assert.Equal(77, response.Value.TokensUsed);
+                    Assert.Equal("req-gemini-e2e", response.Value.RequestId);
+
+                    Assert.NotNull(capturedClientRequest);
+                    Assert.Equal(
+                        "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent",
+                        capturedClientRequest!.RequestUri?.ToString());
+                    Assert.True(capturedClientRequest.Headers.TryGetValues("x-goog-api-key", out var keyVals));
+                    Assert.Equal("gkey_test_12345", keyVals!.Single());
+                    Assert.True(capturedClientRequest.Headers.TryGetValues("x-gemini-request-id", out var reqVals));
+                    Assert.Equal("req-gemini-e2e", reqVals!.Single());
+                    Assert.NotNull(capturedClientPayload);
+                    Assert.Contains("gemini-2.5-flash", capturedClientPayload);
+                    Assert.Contains("Ping Gemini", capturedClientPayload);
+                }
+
+                System.Net.Http.HttpRequestMessage? capturedProbeRequest = null;
+                var (probeSuccess, probeLatency, probeMsg) = await RimMind.ModelService.Diagnostics.EndpointHealthProbe.ProbeEndpointAsync(
+                    endpoint,
+                    default,
+                    (req, _) =>
+                    {
+                        capturedProbeRequest = new System.Net.Http.HttpRequestMessage(req.Method, req.RequestUri);
+                        foreach (var header in req.Headers)
+                        {
+                            capturedProbeRequest.Headers.TryAddWithoutValidation(header.Key, header.Value);
+                        }
+                        return Task.FromResult(new System.Net.Http.HttpResponseMessage(System.Net.HttpStatusCode.OK));
+                    });
+
+                Assert.True(probeSuccess, probeMsg);
+                Assert.True(probeLatency >= 0);
+                Assert.True(endpoint.isHealthy);
+                Assert.NotNull(capturedProbeRequest);
+                Assert.True(capturedProbeRequest!.Headers.TryGetValues("x-goog-api-key", out var probeKeyVals));
+                Assert.Equal("gkey_test_12345", probeKeyVals!.Single());
+                Assert.True(capturedProbeRequest.Headers.TryGetValues("x-gemini-probe", out var probeFlagVals));
+                Assert.Equal("true", probeFlagVals!.Single());
+            }
+            finally
+            {
+                ModelProtocolRegistry.Unregister("gemini_native");
+            }
+        }
+
+        [Fact]
+        public void ModelEndpointConfig_preserves_legacy_ProviderType_and_custom_protocolId_across_Scribe()
+        {
+            ContractCaseRunner.Run(
+                ("built-in providerType and protocolId stay synchronized on mutation", () =>
+                {
+                    var cfg = new ModelEndpointConfig();
+                    Assert.Equal(ProviderType.OpenAICompatible, cfg.providerType);
+                    Assert.Equal("openai", cfg.EffectiveProtocolId);
+
+                    cfg.providerType = ProviderType.AnthropicClaude;
+                    Assert.Equal("anthropic", cfg.protocolId);
+                    Assert.Equal("anthropic", cfg.EffectiveProtocolId);
+
+                    cfg.protocolId = "opencode_go";
+                    Assert.Equal(ProviderType.OpenCodeGo, cfg.providerType);
+                    Assert.Equal("opencode_go", cfg.EffectiveProtocolId);
+
+                    cfg.protocolId = "local_gateway";
+                    Assert.Equal(ProviderType.LocalSubscriptionGateway, cfg.providerType);
+                    Assert.Equal("local_gateway", cfg.EffectiveProtocolId);
+
+                    cfg.protocolId = "custom_gateway";
+                    Assert.Equal("custom_gateway", cfg.protocolId);
+                    Assert.Equal("custom_gateway", cfg.EffectiveProtocolId);
+                }),
+                ("legacy save with only providerType synchronizes protocolId on load", () =>
+                {
+                    var legacyBuffer = new Dictionary<string, object?>
+                    {
+                        ["id"] = "legacy-1",
+                        ["name"] = "Legacy Claude Node",
+                        ["providerType"] = ProviderType.AnthropicClaude,
+                        ["endpoint"] = "https://api.anthropic.com/v1",
+                        ["modelName"] = "claude-3-5-sonnet-20241022",
+                        ["isEnabled"] = true
+                    };
+
+                    var loaded = new ModelEndpointConfig();
+                    try
+                    {
+                        Verse.Scribe_Values.BeginLoad(legacyBuffer, Verse.LoadSaveMode.LoadingVars);
+                        loaded.ExposeData();
+                        Verse.Scribe.mode = Verse.LoadSaveMode.PostLoadInit;
+                        loaded.ExposeData();
+                    }
+                    finally
+                    {
+                        Verse.Scribe_Values.End();
+                    }
+
+                    Assert.Equal(ProviderType.AnthropicClaude, loaded.providerType);
+                    Assert.Equal("anthropic", loaded.protocolId);
+                    Assert.Equal("anthropic", loaded.EffectiveProtocolId);
+                    Assert.Same(AnthropicModelProtocol.Instance, ModelProtocolRegistry.Resolve(loaded));
+                }),
+                ("custom protocolId round-trips across Scribe save and load without loss", () =>
+                {
+                    var original = new ModelEndpointConfig
+                    {
+                        id = "custom-1",
+                        name = "Custom Gateway",
+                        endpoint = "https://custom.gateway/api",
+                        modelName = "custom-model-v1",
+                        protocolId = "custom_gateway",
+                        priority = 2,
+                        weight = 3,
+                        timeoutSeconds = 45,
+                        isEnabled = true
+                    };
+
+                    var buffer = new Dictionary<string, object?>();
+                    var rehydrated = new ModelEndpointConfig();
+                    try
+                    {
+                        Verse.Scribe_Values.BeginSave(buffer);
+                        original.ExposeData();
+
+                        Verse.Scribe_Values.BeginLoad(buffer, Verse.LoadSaveMode.LoadingVars);
+                        rehydrated.ExposeData();
+                        Verse.Scribe.mode = Verse.LoadSaveMode.PostLoadInit;
+                        rehydrated.ExposeData();
+                    }
+                    finally
+                    {
+                        Verse.Scribe_Values.End();
+                    }
+
+                    Assert.Equal("custom-1", rehydrated.id);
+                    Assert.Equal("Custom Gateway", rehydrated.name);
+                    Assert.Equal("custom_gateway", rehydrated.protocolId);
+                    Assert.Equal("custom_gateway", rehydrated.EffectiveProtocolId);
+                    Assert.Equal(ProviderType.OpenAICompatible, rehydrated.providerType);
+                    Assert.Equal(45, rehydrated.timeoutSeconds);
+                }));
+        }
+
+        private sealed class CustomGeminiNativeProtocol : IModelProtocol
+        {
+            public string ProtocolId => "gemini_native";
+            public ProviderType LegacyProviderType => ProviderType.OpenAICompatible;
+            public string DisplayLabelKey => "RimMind.ModelService.Provider.GeminiNative";
+            public string FallbackLabel => "Gemini Native";
+            public string DefaultEndpointUrl => "https://generativelanguage.googleapis.com/v1beta";
+            public string DefaultModel => "gemini-2.5-flash";
+
+            public Result<string, RimMindError> BuildRequestJson(LlmRequestEnvelope envelope, string modelOverride)
+            {
+                string prompt = envelope.Messages?.LastOrDefault()?.Content ?? "";
+                var obj = new Newtonsoft.Json.Linq.JObject
+                {
+                    ["model"] = modelOverride,
+                    ["prompt"] = prompt
+                };
+                return Result<string, RimMindError>.Ok(obj.ToString(Newtonsoft.Json.Formatting.None));
+            }
+
+            public Result<LlmResponse, RimMindError> ParseResponse(string responseBody, LlmRequestEnvelope? envelope = null)
+            {
+                var obj = Newtonsoft.Json.Linq.JObject.Parse(responseBody);
+                string text = obj["candidates"]?[0]?["text"]?.ToString() ?? "";
+                int tokens = obj["tokens"]?.ToObject<int>() ?? 0;
+                return Result<LlmResponse, RimMindError>.Ok(new LlmResponse
+                {
+                    RequestId = envelope?.RequestId ?? "gemini-resp",
+                    Content = text,
+                    TokensUsed = tokens
+                });
+            }
+
+            public void ApplyHeaders(System.Net.Http.HttpRequestMessage request, ModelEndpointConfig endpoint, string? requestId)
+            {
+                string model = !string.IsNullOrEmpty(endpoint.modelName) ? endpoint.modelName : DefaultModel;
+                request.RequestUri = new Uri(endpoint.endpoint.TrimEnd('/') + "/models/" + model + ":generateContent");
+                if (!string.IsNullOrEmpty(endpoint.apiKey))
+                {
+                    request.Headers.TryAddWithoutValidation("x-goog-api-key", endpoint.apiKey);
+                }
+                if (!string.IsNullOrEmpty(requestId))
+                {
+                    request.Headers.TryAddWithoutValidation("x-gemini-request-id", requestId);
+                }
+            }
+
+            public System.Net.Http.HttpRequestMessage BuildHealthProbeRequest(ModelEndpointConfig endpoint, string resolvedUrl)
+            {
+                var req = new System.Net.Http.HttpRequestMessage(System.Net.Http.HttpMethod.Get, resolvedUrl);
+                if (!string.IsNullOrEmpty(endpoint.apiKey))
+                {
+                    req.Headers.TryAddWithoutValidation("x-goog-api-key", endpoint.apiKey);
+                }
+                req.Headers.TryAddWithoutValidation("x-gemini-probe", "true");
+                return req;
+            }
+        }
+
         private sealed class CoreSettingsStub : RimMind.Application.Common.Interfaces.Internal.ISettingsProvider
         {
             public string ApiKey { get; set; } = "";

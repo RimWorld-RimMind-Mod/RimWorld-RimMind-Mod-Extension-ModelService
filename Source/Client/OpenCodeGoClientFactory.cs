@@ -2,6 +2,7 @@ using System;
 using RimMind.Application.Common.Interfaces.Client;
 using RimMind.Application.Common.Interfaces.Internal;
 using RimMind.ModelService.Models;
+using RimMind.ModelService.Protocol;
 using RimMind.ModelService.Settings;
 
 namespace RimMind.ModelService.Client
@@ -18,19 +19,20 @@ namespace RimMind.ModelService.Client
         public string DisplayLabel => global::Verse.Translator.CanTranslate("RimMind.ModelService.Provider.OpenCodeGo")
             ? (string)global::Verse.Translator.Translate("RimMind.ModelService.Provider.OpenCodeGo")
             : "OpenCode Go";
-        public string? DefaultEndpoint => "https://opencode.ai/zen/go/v1";
-        public string? DefaultModelName => "deepseek-v4.1-flash";
+        public string? DefaultEndpoint => OpenCodeGoModelProtocol.Instance.DefaultEndpointUrl;
+        public string? DefaultModelName => OpenCodeGoModelProtocol.Instance.DefaultModel;
         public int OrderWeight => 40;
         public bool VisibleInMenu => true;
 
         public IAIClient Create(ISettingsProvider settings)
         {
+            var protocol = ModelProtocolRegistry.Resolve(ModelProtocolRegistry.OpenCodeGoProtocolId);
             string endpointUrl = !string.IsNullOrWhiteSpace(settings?.ApiEndpoint)
                 ? settings!.ApiEndpoint
-                : "https://opencode.ai/zen/go/v1";
+                : protocol.DefaultEndpointUrl;
             string model = !string.IsNullOrWhiteSpace(settings?.ModelName)
                 ? settings!.ModelName
-                : "deepseek-v4.1-flash";
+                : protocol.DefaultModel;
             string apiKey = settings?.ApiKey ?? string.Empty;
 
             var node = new ModelEndpointConfig
@@ -40,7 +42,8 @@ namespace RimMind.ModelService.Client
                 endpoint = endpointUrl,
                 modelName = model,
                 apiKey = apiKey,
-                providerType = ProviderType.OpenCodeGo,
+                providerType = protocol.LegacyProviderType,
+                protocolId = protocol.ProtocolId,
                 isEnabled = !string.IsNullOrWhiteSpace(apiKey),
                 priority = 0,
                 weight = 1
@@ -53,4 +56,3 @@ namespace RimMind.ModelService.Client
         }
     }
 }
-
