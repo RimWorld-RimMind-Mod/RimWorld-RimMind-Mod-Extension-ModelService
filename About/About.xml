@@ -8,7 +8,65 @@
     <li>1.6</li>
     <li>1.7</li>
   </supportedVersions>
-  <description>Extended Model Service Provider and Local Gateway adapter for RimMind. Adds support for multi-provider routing (OpenAI-compatible, Anthropic Claude Messages, Local Subscription Gateways / sub2api / newapi / Codex Proxy) with auto-failover, load balancing, and connectivity diagnostics. [v1.0]</description>
+  <description>[h1]RimMind - Extension: ModelService (v2.0)[/h1]
+Enterprise multi-provider gateway, Anthropic Claude native protocol adapter, local subscription loopback guard, and zero-downtime failover load balancer for the RimMind suite. Extends [code]RimMind-Core[/code] with multi-node routing, hardware-level ephemeral KV caching, and real-time endpoint health diagnostics.
+
+[b]v2.0 Clean Architecture &amp; RimWorld 1.6 / 1.7 Dual-Version Support:[/b]
+[list]
+[*][b]RimWorld 1.6 &amp; 1.7 (Waylith / .NET 10) Ready[/b]: Native multi-target compilation supporting both RimWorld 1.6 (.NET Framework 4.8) and RimWorld 1.7 (.NET 10 / Harmony 2.x &amp; 3.x).
+[*][b]Multi-Provider Protocol Adapters[/b]: Seamlessly routes across OpenAI-compatible APIs, native [b]Anthropic Claude Messages API[/b] (with [code]cache_control: ephemeral[/code]), [b]OpenCode Go[/b] subscription presets, and local subscription gateways ([b]Codex Proxy, Sub2API, NewAPI[/b]).
+[*][b]Failover Load Balancing &amp; Circuit Breaker[/b]: Supports [code]PriorityFailover[/code] and [code]RoundRobin[/code] routing across multiple endpoint nodes with 60-second automatic circuit isolation.
+[/list]
+
+[h2]What Is RimMind[/h2]
+RimMind is an enterprise-grade, AI-powered RimWorld mod suite. Integrated with Large Language Models (LLM), it transforms colonists into self-reflecting agents with distinct personalities, three-tier memories, natural spoken dialogues, autonomous mechanisms, and dynamic storytelling.
+
+[h2]Sub-mod List &amp; Dependency Relationships[/h2]
+[table]
+[tr][th]Mod[/th][th]Responsibility[/th][th]Dependencies[/th][th]GitHub[/th][/tr]
+[tr][td]RimMind-Core[/td][td]LLM runtime, 4-Zone context engine, async queue, ToolCall registry &amp; F8 Hub[/td][td]Harmony[/td][td][url=https://github.com/RimWorld-RimMind-Mod/RimWorld-RimMind-Mod-Core]Link[/url][/td][/tr]
+[tr][td]RimMind-Actions[/td][td]Composite ToolCall mechanisms, battlefield triage &amp; autonomous construction[/td][td]Core[/td][td][url=https://github.com/RimWorld-RimMind-Mod/RimWorld-RimMind-Mod-Actions]Link[/url][/td][/tr]
+[tr][td]RimMind-Advisor[/td][td]Colonist self-reflective advice cards, 5-domain autonomy &amp; player approval[/td][td]Core, Actions[/td][td][url=https://github.com/RimWorld-RimMind-Mod/RimWorld-RimMind-Mod-Advisor]Link[/url][/td][/tr]
+[tr][td]RimMind-Dialogue[/td][td]Contextual spoken dialogue via express_dialogue ToolCall &amp; speech bubbles[/td][td]Core[/td][td][url=https://github.com/RimWorld-RimMind-Mod/RimWorld-RimMind-Mod-Dialogue]Link[/url][/td][/tr]
+[tr][td]RimMind-Memory[/td][td]3-Tier cognitive memory hierarchy, work aggregation &amp; temporal decay[/td][td]Core[/td][td][url=https://github.com/RimWorld-RimMind-Mod/RimWorld-RimMind-Mod-Memory]Link[/url][/td][/tr]
+[tr][td]RimMind-Personality[/td][td]Big-Five psychological profiles, dawn monologues &amp; dynamic mood thoughts[/td][td]Core[/td][td][url=https://github.com/RimWorld-RimMind-Mod/RimWorld-RimMind-Mod-Personality]Link[/url][/td][/tr]
+[tr][td]RimMind-Storyteller[/td][td]AI Story Director, dramatic tension curve, chained arcs &amp; Storyteller Altar[/td][td]Core, Memory[/td][td][url=https://github.com/RimWorld-RimMind-Mod/RimWorld-RimMind-Mod-Storyteller]Link[/url][/td][/tr]
+[tr][td][b]RimMind-Extension-ModelService[/b][/td][td]Multi-provider routing, Anthropic KV cache, local gateways &amp; load balancing[/td][td]Core[/td][td][url=https://github.com/RimWorld-RimMind-Mod/RimWorld-RimMind-Mod-Extension-ModelService]Link[/url][/td][/tr]
+[tr][td]RimMind-Bridge-RimChat[/td][td]RimChat compatibility bridge: dialogue/action mutual exclusion &amp; context sync[/td][td]Core, RimChat[/td][td][url=https://github.com/RimWorld-RimMind-Mod/RimWorld-RimMind-Mod-Bridge-RimChat]Link[/url][/td][/tr]
+[tr][td]RimMind-Bridge-RimTalk[/td][td]RimTalk compatibility bridge: bubble harmonization &amp; bidirectional context[/td][td]Core, RimTalk[/td][td][url=https://github.com/RimWorld-RimMind-Mod/RimWorld-RimMind-Mod-Bridge-RimTalk]Link[/url][/td][/tr]
+[/table]
+[code]Core ──┬── Actions ── Advisor
+       ├── Dialogue
+       ├── Memory ── Storyteller
+       ├── Personality
+       ├── Extension-ModelService
+       ├── Bridge-RimChat
+       └── Bridge-RimTalk[/code]
+
+[h2]Core Features[/h2]
+[list]
+[*][b]Multi-Provider Protocol Routing[/b] - Plugs directly into [code]RimMind-Core[/code]'s [code]IAIClientFactory[/code] registry to support [code]OpenAICompatible[/code], [code]AnthropicClaude[/code], [code]LocalSubscriptionGateway[/code], and [code]OpenCodeGo[/code] endpoints.
+[*][b]Anthropic Ephemeral KV-Cache Adapter[/b] - Native Anthropic [code]/v1/messages[/code] protocol support that automatically tags static Zone 1 &amp; Zone 2 prefix blocks with [code]cache_control: ephemeral[/code], slashing Claude latency and token costs.
+[*][b]OpenCode Go &amp; Local Gateway Presets[/b] - One-click setup for OpenCode Go ([code]https://opencode.ai/zen/go/v1[/code] with [code]x-opencode-session[/code] isolation) and local proxy gateways (Codex, Sub2API, NewAPI).
+[*][b]Local Loopback Security Guard ([code]LocalLoopbackValidator[/code])[/b] - Strictly verifies loopback addresses ([code]127.0.0.1[/code], [code]localhost[/code], [code]::1[/code]) for local subscription proxies to prevent accidental token leakage over public networks.
+[*][b]Priority Failover &amp; Round-Robin Load Balancing[/b] - Automatically shifts traffic away from rate-limited (HTTP 429) or unhealthy (5xx/timeout) nodes for 60 seconds, with one-click millisecond RTT health probing ([code]EndpointHealthProbe[/code]) and F8 Debug Hub telemetry.
+[/list]
+
+[h2]Supported Gateway Modes[/h2]
+[table]
+[tr][th]Provider Mode[/th][th]Protocol &amp; Features[/th][th]Best Use Case[/th][/tr]
+[tr][td]OpenAICompatible[/td][td]Standard /v1/chat/completions with ToolCalls[/td][td]DeepSeek, OpenAI, OpenRouter, SiliconFlow, Ollama, vLLM[/td][/tr]
+[tr][td]AnthropicClaude[/td][td]Native /v1/messages + ephemeral prefix caching[/td][td]Claude 3.5 Sonnet / Haiku with hardware KV cache reuse[/td][/tr]
+[tr][td]LocalSubscriptionGateway[/td][td]Loopback-guarded local proxy (127.0.0.1 / ::1)[/td][td]Codex Proxy, Sub2API, NewAPI, CLIProxyAPI local gateways[/td][/tr]
+[tr][td]OpenCodeGo[/td][td]Session-isolated OpenCode Go cloud preset[/td][td]One-click OpenCode Go subscription routing[/td][/tr]
+[/table]
+
+[h2]Frequently Asked Questions[/h2]
+[b]Q: How do I enable multi-node load balancing?[/b]
+A: Open [b]Options / Mod Settings / RimMind - Extended Model Service[/b], enable Extended Service, choose [i]PriorityFailover[/i] or [i]RoundRobin[/i], and add your endpoint nodes.
+
+[b]Q: What happens if my primary endpoint hits a 429 rate limit?[/b]
+A: The load balancer immediately isolates the degraded node for 60 seconds and transparently retries the request on your next healthy backup node without dropping the colonist's action.</description>
   <modDependencies>
     <li>
       <packageId>brrainz.harmony</packageId>
