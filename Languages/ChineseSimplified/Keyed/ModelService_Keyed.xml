@@ -16,6 +16,8 @@
   <RimMind.ModelService.Settings.AddCodexPreset.Desc>快速添加本地 Codex 代理网关端点配置预设。</RimMind.ModelService.Settings.AddCodexPreset.Desc>
   <RimMind.ModelService.Settings.AddOpenCodeGoPreset>+ OpenCode Go 预设</RimMind.ModelService.Settings.AddOpenCodeGoPreset>
   <RimMind.ModelService.Settings.AddOpenCodeGoPreset.Desc>快速添加 OpenCode Go 订阅直连端点配置预设。</RimMind.ModelService.Settings.AddOpenCodeGoPreset.Desc>
+  <RimMind.ModelService.Settings.AddDeepSeekPreset>+ DeepSeek 官方预设</RimMind.ModelService.Settings.AddDeepSeekPreset>
+  <RimMind.ModelService.Settings.AddDeepSeekPreset.Desc>快速添加 DeepSeek 官方 V4 节点，默认按需启用思考模式并开启高安全防护。</RimMind.ModelService.Settings.AddDeepSeekPreset.Desc>
   <RimMind.ModelService.Settings.AddCustomEndpoint>+ 自定义节点</RimMind.ModelService.Settings.AddCustomEndpoint>
   <RimMind.ModelService.Settings.AddCustomEndpoint.Desc>添加一个自定义模型服务节点配置。</RimMind.ModelService.Settings.AddCustomEndpoint.Desc>
   <RimMind.ModelService.Settings.RemoveEndpoint>删除</RimMind.ModelService.Settings.RemoveEndpoint>
@@ -28,7 +30,7 @@
   <RimMind.ModelService.Endpoint.BackupNode>#{0} 备用</RimMind.ModelService.Endpoint.BackupNode>
   <RimMind.ModelService.Endpoint.NameLabel>名称:</RimMind.ModelService.Endpoint.NameLabel>
   <RimMind.ModelService.Endpoint.ModelLabel>模型:</RimMind.ModelService.Endpoint.ModelLabel>
-  <RimMind.ModelService.Endpoint.Model.Desc>调用此端点时传递的模型名称（例如 gpt-4o-mini 或 deepseek-chat）。</RimMind.ModelService.Endpoint.Model.Desc>
+  <RimMind.ModelService.Endpoint.Model.Desc>调用此端点时传递的模型名称（例如 gpt-4o-mini、deepseek-flash 或 deepseek-v4-pro）。</RimMind.ModelService.Endpoint.Model.Desc>
   <RimMind.ModelService.Endpoint.Url.Desc>模型服务的完整 API 请求 URL（例如 http://127.0.0.1:8000/v1）。</RimMind.ModelService.Endpoint.Url.Desc>
   <RimMind.ModelService.Endpoint.ApiKey.Desc>端点的访问密钥或令牌。留空表示无需认证。</RimMind.ModelService.Endpoint.ApiKey.Desc>
   <RimMind.ModelService.Endpoint.Enabled>启用</RimMind.ModelService.Endpoint.Enabled>
@@ -42,12 +44,21 @@
   <RimMind.ModelService.Endpoint.StatusHealthy>健康</RimMind.ModelService.Endpoint.StatusHealthy>
   <RimMind.ModelService.Endpoint.StatusUnhealthy>不可用</RimMind.ModelService.Endpoint.StatusUnhealthy>
   <RimMind.ModelService.Endpoint.StatusTesting>检测中...</RimMind.ModelService.Endpoint.StatusTesting>
+  <RimMind.ModelService.Endpoint.Thinking.FollowRequest>思考模式: 自动</RimMind.ModelService.Endpoint.Thinking.FollowRequest>
+  <RimMind.ModelService.Endpoint.Thinking.ForceEnabled>思考模式: 开启</RimMind.ModelService.Endpoint.Thinking.ForceEnabled>
+  <RimMind.ModelService.Endpoint.Thinking.ForceDisabled>思考模式: 关闭</RimMind.ModelService.Endpoint.Thinking.ForceDisabled>
+  <RimMind.ModelService.Endpoint.Thinking.Desc>控制 DeepSeek 原生思考模式。自动模式按场景语义切换（角色闲聊关闭思考以降低延迟，自主行为与顾问开启思考）。</RimMind.ModelService.Endpoint.Thinking.Desc>
+  <RimMind.ModelService.Endpoint.Safety.Standard>安全策略: 标准</RimMind.ModelService.Endpoint.Safety.Standard>
+  <RimMind.ModelService.Endpoint.Safety.High>安全策略: 高</RimMind.ModelService.Endpoint.Safety.High>
+  <RimMind.ModelService.Endpoint.Safety.Desc>控制 DeepSeek safety_check 内容安全防护等级。设为「高」时按官方文档下发 safety_check.level=high 并省略 temperature。</RimMind.ModelService.Endpoint.Safety.Desc>
 
   <!-- Providers -->
   <RimMind.ModelService.Provider.OpenAICompatible>OpenAI 兼容协议</RimMind.ModelService.Provider.OpenAICompatible>
   <RimMind.ModelService.Provider.AnthropicClaude>Anthropic Claude 原生</RimMind.ModelService.Provider.AnthropicClaude>
   <RimMind.ModelService.Provider.LocalSubscriptionGateway>本地网关 (sub2api)</RimMind.ModelService.Provider.LocalSubscriptionGateway>
   <RimMind.ModelService.Provider.OpenCodeGo>OpenCode Go (订阅直连)</RimMind.ModelService.Provider.OpenCodeGo>
+  <RimMind.ModelService.Provider.DeepSeekOfficial>DeepSeek 官方协议</RimMind.ModelService.Provider.DeepSeekOfficial>
+  <RimMind.ModelService.Provider.DeepSeekFactory>DeepSeek 官方直连 (V4 / 思考 / 安全)</RimMind.ModelService.Provider.DeepSeekFactory>
   <RimMind.ModelService.Provider.ExtendedService>扩展模型服务 (多节点容灾/负载均衡)</RimMind.ModelService.Provider.ExtendedService>
 
   <!-- Security & Validation Messages -->

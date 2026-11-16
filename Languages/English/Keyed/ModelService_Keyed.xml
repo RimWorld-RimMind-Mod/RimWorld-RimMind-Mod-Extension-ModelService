@@ -16,6 +16,8 @@
   <RimMind.ModelService.Settings.AddCodexPreset.Desc>Quickly add local Codex gateway endpoint preset.</RimMind.ModelService.Settings.AddCodexPreset.Desc>
   <RimMind.ModelService.Settings.AddOpenCodeGoPreset>+ OpenCode Go Preset</RimMind.ModelService.Settings.AddOpenCodeGoPreset>
   <RimMind.ModelService.Settings.AddOpenCodeGoPreset.Desc>Quickly add OpenCode Go subscription endpoint preset.</RimMind.ModelService.Settings.AddOpenCodeGoPreset.Desc>
+  <RimMind.ModelService.Settings.AddDeepSeekPreset>+ DeepSeek Preset</RimMind.ModelService.Settings.AddDeepSeekPreset>
+  <RimMind.ModelService.Settings.AddDeepSeekPreset.Desc>Quickly add DeepSeek Official V4 node with adaptive thinking &amp; high safety mode.</RimMind.ModelService.Settings.AddDeepSeekPreset.Desc>
   <RimMind.ModelService.Settings.AddCustomEndpoint>+ Custom Node</RimMind.ModelService.Settings.AddCustomEndpoint>
   <RimMind.ModelService.Settings.AddCustomEndpoint.Desc>Add a custom model service endpoint configuration.</RimMind.ModelService.Settings.AddCustomEndpoint.Desc>
   <RimMind.ModelService.Settings.RemoveEndpoint>Delete</RimMind.ModelService.Settings.RemoveEndpoint>
@@ -28,7 +30,7 @@
   <RimMind.ModelService.Endpoint.BackupNode>#{0} Backup</RimMind.ModelService.Endpoint.BackupNode>
   <RimMind.ModelService.Endpoint.NameLabel>Name:</RimMind.ModelService.Endpoint.NameLabel>
   <RimMind.ModelService.Endpoint.ModelLabel>Model:</RimMind.ModelService.Endpoint.ModelLabel>
-  <RimMind.ModelService.Endpoint.Model.Desc>Model identifier passed when querying this endpoint (e.g. gpt-4o-mini or deepseek-chat).</RimMind.ModelService.Endpoint.Model.Desc>
+  <RimMind.ModelService.Endpoint.Model.Desc>Model identifier passed when querying this endpoint (e.g. gpt-4o-mini, deepseek-flash, or deepseek-v4-pro).</RimMind.ModelService.Endpoint.Model.Desc>
   <RimMind.ModelService.Endpoint.Url.Desc>Complete API base URL for this endpoint (e.g. http://127.0.0.1:8000/v1).</RimMind.ModelService.Endpoint.Url.Desc>
   <RimMind.ModelService.Endpoint.ApiKey.Desc>API key or token for this endpoint. Leave empty if authentication is not required.</RimMind.ModelService.Endpoint.ApiKey.Desc>
   <RimMind.ModelService.Endpoint.Enabled>Enabled</RimMind.ModelService.Endpoint.Enabled>
@@ -42,12 +44,21 @@
   <RimMind.ModelService.Endpoint.StatusHealthy>Healthy</RimMind.ModelService.Endpoint.StatusHealthy>
   <RimMind.ModelService.Endpoint.StatusUnhealthy>Unhealthy</RimMind.ModelService.Endpoint.StatusUnhealthy>
   <RimMind.ModelService.Endpoint.StatusTesting>Probing...</RimMind.ModelService.Endpoint.StatusTesting>
+  <RimMind.ModelService.Endpoint.Thinking.FollowRequest>Thinking: Auto</RimMind.ModelService.Endpoint.Thinking.FollowRequest>
+  <RimMind.ModelService.Endpoint.Thinking.ForceEnabled>Thinking: On</RimMind.ModelService.Endpoint.Thinking.ForceEnabled>
+  <RimMind.ModelService.Endpoint.Thinking.ForceDisabled>Thinking: Off</RimMind.ModelService.Endpoint.Thinking.ForceDisabled>
+  <RimMind.ModelService.Endpoint.Thinking.Desc>Controls DeepSeek native thinking mode. Auto follows per-scenario intent (off for dialogue, enabled for autonomous actions and advisor).</RimMind.ModelService.Endpoint.Thinking.Desc>
+  <RimMind.ModelService.Endpoint.Safety.Standard>Safety: Standard</RimMind.ModelService.Endpoint.Safety.Standard>
+  <RimMind.ModelService.Endpoint.Safety.High>Safety: High</RimMind.ModelService.Endpoint.Safety.High>
+  <RimMind.ModelService.Endpoint.Safety.Desc>Controls DeepSeek safety_check level. High sends safety_check.level=high and omits temperature per official guidelines.</RimMind.ModelService.Endpoint.Safety.Desc>
 
   <!-- Providers -->
   <RimMind.ModelService.Provider.OpenAICompatible>OpenAI Compatible</RimMind.ModelService.Provider.OpenAICompatible>
   <RimMind.ModelService.Provider.AnthropicClaude>Anthropic Claude Native</RimMind.ModelService.Provider.AnthropicClaude>
   <RimMind.ModelService.Provider.LocalSubscriptionGateway>Local Gateway (sub2api)</RimMind.ModelService.Provider.LocalSubscriptionGateway>
   <RimMind.ModelService.Provider.OpenCodeGo>OpenCode Go (Subscription)</RimMind.ModelService.Provider.OpenCodeGo>
+  <RimMind.ModelService.Provider.DeepSeekOfficial>DeepSeek Official</RimMind.ModelService.Provider.DeepSeekOfficial>
+  <RimMind.ModelService.Provider.DeepSeekFactory>DeepSeek Official (V4 / Thinking / Safety)</RimMind.ModelService.Provider.DeepSeekFactory>
   <RimMind.ModelService.Provider.ExtendedService>Extended Model Service (Multi-Node / Failover)</RimMind.ModelService.Provider.ExtendedService>
 
   <!-- Security & Validation Messages -->

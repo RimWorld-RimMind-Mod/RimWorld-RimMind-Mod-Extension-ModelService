@@ -27,5 +27,15 @@ namespace RimMind.ModelService.Models
 
         public static ModelEndpointConfig CreateOpenCodeGoPreset(int priority = 1) =>
             CreatePreset(ModelProtocolRegistry.OpenCodeGoProtocolId, "OpenCode Go (Direct)", priority);
+
+        public static ModelEndpointConfig CreateDeepSeekPreset(int priority = 0)
+        {
+            var cfg = CreatePreset(ModelProtocolRegistry.DeepSeekProtocolId, "DeepSeek Official", priority);
+            cfg.timeoutSeconds = 60;
+            cfg.isEnabled = false;
+            cfg.thinkingPolicy = EndpointThinkingPolicy.FollowRequest;
+            cfg.safetyLevel = EndpointSafetyLevel.High;
+            return cfg;
+        }
     }
 }

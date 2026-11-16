@@ -1,4 +1,6 @@
+using RimMind.Application.Common.Interfaces.Audio;
 using RimMind.Application.Common.Interfaces.Client;
+using RimMind.ModelService.Audio;
 using RimMind.ModelService.Client;
 using RimMind.ModelService.Integration;
 using RimMind.ModelService.Settings;
@@ -43,9 +45,22 @@ namespace RimMind.ModelService
                 var factoryRegistry = RimMindAPI.Ext.Get<IAIClientFactory>();
                 if (factoryRegistry != null)
                 {
+                    factoryRegistry.Register(new DeepSeekClientFactory());
                     factoryRegistry.Register(new OpenCodeGoClientFactory());
                     factoryRegistry.Register(new ModelServiceClientFactory());
-                    Log.Message("[RimMind-ModelService] Extended model service providers registered successfully (opencode, extended_service).");
+                    Log.Message("[RimMind-ModelService] Extended model service providers registered successfully (deepseek_native, opencode, extended_service).");
+                }
+
+                var ttsRegistry = RimMindAPI.Ext.Get<ISpeechSynthesizer>();
+                if (ttsRegistry != null)
+                {
+                    ttsRegistry.Register(new DeepSeekSpeechSynthesizer());
+                }
+
+                var asrRegistry = RimMindAPI.Ext.Get<ISpeechRecognizer>();
+                if (asrRegistry != null)
+                {
+                    asrRegistry.Register(new DeepSeekSpeechRecognizer());
                 }
 
                 var settingsTabRegistry = RimMindAPI.Ext.Get<ISettingsTab>();

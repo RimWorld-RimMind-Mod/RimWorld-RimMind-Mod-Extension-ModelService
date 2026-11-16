@@ -146,6 +146,7 @@ namespace RimMind.ModelService.Client
             string lastErrorMessage = "";
             RimMindError? lastError = null;
             RimMindError? lastSecurityError = null;
+            RimMindError? lastQuotaOrAuthError = null;
 
             for (int attempt = 0; attempt < maxAttempts; attempt++)
             {
@@ -192,8 +193,22 @@ namespace RimMind.ModelService.Client
                         : Result<LlmResponse, RimMindError>.Err(RimMindErrors.Cancelled());
                 }
 
-                // Permanent client errors (400 bad request, context length, 401/403 auth) must NOT trip the circuit
-                // breaker or cascade across all backup endpoints.
+                // Content-moderation and permanent client errors must NOT trip circuit breakers or fail over.
+                if (result.Error.Code == RimMindErrorCode.ContentFiltered ||
+                    result.Error.Code == RimMindErrorCode.ClientPermanentFailure)
+                {
+                    return result;
+                }
+
+                // Billing / invalid-key failures isolate THIS node immediately and try backup nodes.
+                if (result.Error.Code == RimMindErrorCode.ClientQuotaOrAuthFailure)
+                {
+                    node.IsolateImmediately(_clockMs());
+                    lastQuotaOrAuthError = result.Error;
+                    lastErrorMessage = result.Error.Message;
+                    continue;
+                }
+
                 if (!IsTransientError(result.Error))
                 {
                     return result;
@@ -208,6 +223,11 @@ namespace RimMind.ModelService.Client
             if (callerToken.IsCancellationRequested)
             {
                 return Result<LlmResponse, RimMindError>.Err(RimMindErrors.Cancelled());
+            }
+
+            if (lastError == null && lastQuotaOrAuthError != null)
+            {
+                return Result<LlmResponse, RimMindError>.Err(lastQuotaOrAuthError);
             }
 
             if (lastError == null && lastSecurityError != null)
@@ -239,7 +259,10 @@ namespace RimMind.ModelService.Client
             try
             {
                 string modelOverride = !string.IsNullOrEmpty(node.modelName) ? node.modelName : protocol.DefaultModel;
-                var payloadResult = protocol.BuildRequestJson(envelope, modelOverride);
+                var contextual = protocol as IContextualModelProtocol;
+                var payloadResult = contextual != null
+                    ? contextual.BuildRequestJson(envelope, node, modelOverride)
+                    : protocol.BuildRequestJson(envelope, modelOverride);
                 if (payloadResult.IsErr)
                 {
                     return Result<LlmResponse, RimMindError>.Err(payloadResult.Error);
@@ -261,11 +284,10 @@ namespace RimMind.ModelService.Client
                 {
                     int statusCode = (int)response.StatusCode;
                     string safeBody = SanitizeAndTruncate(responseBody, node.apiKey);
-                    string errMsg = $"Node '{node.name}' HTTP {statusCode}: {safeBody}";
-                    return Result<LlmResponse, RimMindError>.Err(
-                        (statusCode == 429 || statusCode >= 500 || statusCode == 408)
-                            ? RimMindErrors.ClientTransient(errMsg)
-                            : RimMindErrors.ClientPermanent(errMsg));
+                    RimMindError classifiedError = contextual != null
+                        ? contextual.ClassifyHttpError(statusCode, safeBody, node)
+                        : HttpErrorClassifier.ClassifyDefault(statusCode, safeBody, node.name);
+                    return Result<LlmResponse, RimMindError>.Err(classifiedError);
                 }
 
                 var parseResult = protocol.ParseResponse(responseBody, envelope);

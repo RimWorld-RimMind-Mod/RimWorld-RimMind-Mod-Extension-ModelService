@@ -88,6 +88,8 @@ namespace RimMind.ModelService.Models
         public int weight = 1;
         public int timeoutSeconds = 60;
         public bool isEnabled = true;
+        public EndpointThinkingPolicy thinkingPolicy = EndpointThinkingPolicy.FollowRequest;
+        public EndpointSafetyLevel safetyLevel = EndpointSafetyLevel.Standard;
 
         public bool IsLoopbackAddress => Security.LocalLoopbackValidator.IsLoopbackAddress(endpoint);
 
@@ -156,6 +158,16 @@ namespace RimMind.ModelService.Models
             }
         }
 
+        public void IsolateImmediately(long currentTick, long cooldownTicks = 60000)
+        {
+            LastFailureTimestampMs = currentTick;
+            int current = Volatile.Read(ref _consecutiveFailures);
+            if (current < 3)
+                Interlocked.Exchange(ref _consecutiveFailures, 3);
+            isolatedUntilMs = currentTick + cooldownTicks;
+            isHealthy = false;
+        }
+
         public void SynchronizeProtocol()
         {
             if (string.IsNullOrWhiteSpace(_protocolId))
@@ -211,6 +223,8 @@ namespace RimMind.ModelService.Models
             Scribe_Values.Look(ref weight, "weight", 1);
             Scribe_Values.Look(ref timeoutSeconds, "timeoutSeconds", 60);
             Scribe_Values.Look(ref isEnabled, "isEnabled", true);
+            Scribe_Values.Look(ref thinkingPolicy, "thinkingPolicy", EndpointThinkingPolicy.FollowRequest);
+            Scribe_Values.Look(ref safetyLevel, "safetyLevel", EndpointSafetyLevel.Standard);
 
             SynchronizeProtocol();
         }
@@ -220,5 +234,8 @@ namespace RimMind.ModelService.Models
 
         public static ModelEndpointConfig CreateOpenCodeGoPreset(int priority = 1) =>
             ModelEndpointPresets.CreateOpenCodeGoPreset(priority);
+
+        public static ModelEndpointConfig CreateDeepSeekPreset(int priority = 0) =>
+            ModelEndpointPresets.CreateDeepSeekPreset(priority);
     }
 }

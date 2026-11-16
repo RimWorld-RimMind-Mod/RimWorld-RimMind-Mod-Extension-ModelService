@@ -36,12 +36,18 @@
     <Compile Include="../Source/Security/SecretRedactor.cs" />
     <Compile Include="../Source/Balancing/LoadBalancer.cs" />
     <Compile Include="../Source/Protocol/IModelProtocol.cs" />
+    <Compile Include="../Source/Protocol/HttpErrorClassifier.cs" />
     <Compile Include="../Source/Protocol/ModelProtocolRegistry.cs" />
     <Compile Include="../Source/Protocol/OpenAIProtocolAdapter.cs" />
     <Compile Include="../Source/Protocol/AnthropicProtocolAdapter.cs" />
+    <Compile Include="../Source/Protocol/DeepSeekProtocolAdapter.cs" />
     <Compile Include="../Source/Client/ModelServiceClient.cs" />
     <Compile Include="../Source/Client/ModelServiceClientFactory.cs" />
+    <Compile Include="../Source/Client/DeepSeekClientFactory.cs" />
     <Compile Include="../Source/Client/OpenCodeGoClientFactory.cs" />
+    <Compile Include="../Source/Audio/DeepSeekAudioEndpointResolver.cs" />
+    <Compile Include="../Source/Audio/DeepSeekSpeechSynthesizer.cs" />
+    <Compile Include="../Source/Audio/DeepSeekSpeechRecognizer.cs" />
     <Compile Include="../Source/Diagnostics/EndpointHealthProbe.cs" />
   </ItemGroup>
 

@@ -59,15 +59,30 @@ namespace RimMind.ModelService.Settings
             }
             listing.Gap(14f);
 
-            // 3. Top Action Buttons Row
+            // 3. Top Action Buttons Row (wrap to second row if needed)
             SettingsUIDrawer.DrawSectionHeader(
                 listing,
                 "RimMind.ModelService.Settings.EndpointsSection".Translate());
             var buttonRow = listing.GetRect(30f);
             float curBtnX = buttonRow.x;
+            float curBtnY = buttonRow.y;
+            float rowMaxX = buttonRow.xMax;
+
+            Rect NextButtonRect(float width)
+            {
+                if (curBtnX > buttonRow.x && curBtnX + width > rowMaxX)
+                {
+                    var nextRow = listing.GetRect(34f);
+                    curBtnX = nextRow.x;
+                    curBtnY = nextRow.y + 4f;
+                }
+                var rect = new Rect(curBtnX, curBtnY, width, 30f);
+                curBtnX += width + 5f;
+                return rect;
+            }
 
             // [+ Codex 预设] (140px)
-            var codexRect = new Rect(curBtnX, buttonRow.y, 140f, 30f);
+            var codexRect = NextButtonRect(140f);
             if (Widgets.ButtonText(codexRect, "RimMind.ModelService.Settings.AddCodexPreset".Translate()))
             {
                 lock (settings.EndpointSyncRoot)
@@ -77,10 +92,9 @@ namespace RimMind.ModelService.Settings
                 }
             }
             TooltipHandler.TipRegion(codexRect, "RimMind.ModelService.Settings.AddCodexPreset.Desc".Translate());
-            curBtnX += 145f;
 
             // [+ OpenCode Go 预设] (160px)
-            var openCodeRect = new Rect(curBtnX, buttonRow.y, 160f, 30f);
+            var openCodeRect = NextButtonRect(160f);
             if (Widgets.ButtonText(openCodeRect, "RimMind.ModelService.Settings.AddOpenCodeGoPreset".Translate()))
             {
                 lock (settings.EndpointSyncRoot)
@@ -90,10 +104,23 @@ namespace RimMind.ModelService.Settings
                 }
             }
             TooltipHandler.TipRegion(openCodeRect, "RimMind.ModelService.Settings.AddOpenCodeGoPreset.Desc".Translate());
-            curBtnX += 165f;
+
+            // [+ DeepSeek 官方预设] (145px)
+            var deepSeekRect = NextButtonRect(145f);
+            if (Widgets.ButtonText(deepSeekRect, TranslateOrFallback("RimMind.ModelService.Settings.AddDeepSeekPreset", "+ DeepSeek Preset")))
+            {
+                lock (settings.EndpointSyncRoot)
+                {
+                    var preset = ModelEndpointPresets.CreateDeepSeekPreset(settings.endpoints.Count);
+                    settings.endpoints.Add(preset);
+                }
+            }
+            TooltipHandler.TipRegion(
+                deepSeekRect,
+                TranslateOrFallback("RimMind.ModelService.Settings.AddDeepSeekPreset.Desc", "Quickly add DeepSeek official API node with adaptive thinking & high safety mode."));
 
             // [+ 自定义节点] (130px)
-            var customRect = new Rect(curBtnX, buttonRow.y, 130f, 30f);
+            var customRect = NextButtonRect(130f);
             if (Widgets.ButtonText(customRect, "RimMind.ModelService.Settings.AddCustomEndpoint".Translate()))
             {
                 lock (settings.EndpointSyncRoot)
@@ -113,10 +140,9 @@ namespace RimMind.ModelService.Settings
                 }
             }
             TooltipHandler.TipRegion(customRect, "RimMind.ModelService.Settings.AddCustomEndpoint.Desc".Translate());
-            curBtnX += 135f;
 
             // [测试全部] (130px)
-            var testAllRect = new Rect(curBtnX, buttonRow.y, 130f, 30f);
+            var testAllRect = NextButtonRect(130f);
             if (Widgets.ButtonText(testAllRect, "RimMind.ModelService.Settings.TestAllEndpoints".Translate()))
             {
                 TriggerTestAllEndpoints(settings);
@@ -382,6 +408,61 @@ namespace RimMind.ModelService.Settings
                     string tip = "RimMind.ModelService.Security.OpenCodeGoSessionRouted.Desc".Translate();
                     TooltipHandler.TipRegion(bannerRect, tip);
                 }
+                else if (string.Equals(currentProtocol.ProtocolId, ModelProtocolRegistry.DeepSeekProtocolId, StringComparison.OrdinalIgnoreCase))
+                {
+                    float controlsX = statusX + 165f;
+                    float availW = rightXMax - controlsX;
+                    if (availW >= 180f)
+                    {
+                        float btnW = Math.Min(175f, (availW - 8f) / 2f);
+                        var thinkingRect = new Rect(controlsX, row4Y, btnW, 24f);
+                        string thinkingLabel = GetThinkingPolicyLabel(endpoint.thinkingPolicy);
+                        if (Widgets.ButtonText(thinkingRect, thinkingLabel))
+                        {
+                            var captured = endpoint;
+                            var opts = new List<FloatMenuOption>
+                            {
+                                new FloatMenuOption(
+                                    GetThinkingPolicyLabel(EndpointThinkingPolicy.FollowRequest),
+                                    () => captured.thinkingPolicy = EndpointThinkingPolicy.FollowRequest),
+                                new FloatMenuOption(
+                                    GetThinkingPolicyLabel(EndpointThinkingPolicy.ForceEnabled),
+                                    () => captured.thinkingPolicy = EndpointThinkingPolicy.ForceEnabled),
+                                new FloatMenuOption(
+                                    GetThinkingPolicyLabel(EndpointThinkingPolicy.ForceDisabled),
+                                    () => captured.thinkingPolicy = EndpointThinkingPolicy.ForceDisabled),
+                            };
+                            Find.WindowStack.Add(new FloatMenu(opts));
+                        }
+                        TooltipHandler.TipRegion(
+                            thinkingRect,
+                            TranslateOrFallback(
+                                "RimMind.ModelService.Endpoint.Thinking.Desc",
+                                "Controls DeepSeek native thinking mode. Auto follows per-scenario intent (disabled for Dialogue, enabled for Agent/Advisor)."));
+
+                        var safetyRect = new Rect(controlsX + btnW + 8f, row4Y, btnW, 24f);
+                        string safetyLabel = GetSafetyLevelLabel(endpoint.safetyLevel);
+                        if (Widgets.ButtonText(safetyRect, safetyLabel))
+                        {
+                            var captured = endpoint;
+                            var opts = new List<FloatMenuOption>
+                            {
+                                new FloatMenuOption(
+                                    GetSafetyLevelLabel(EndpointSafetyLevel.Standard),
+                                    () => captured.safetyLevel = EndpointSafetyLevel.Standard),
+                                new FloatMenuOption(
+                                    GetSafetyLevelLabel(EndpointSafetyLevel.High),
+                                    () => captured.safetyLevel = EndpointSafetyLevel.High),
+                            };
+                            Find.WindowStack.Add(new FloatMenu(opts));
+                        }
+                        TooltipHandler.TipRegion(
+                            safetyRect,
+                            TranslateOrFallback(
+                                "RimMind.ModelService.Endpoint.Safety.Desc",
+                                "Controls DeepSeek safety_check level. High sends safety_check.level=high and omits temperature for stricter content moderation."));
+                    }
+                }
 
                 curY += cardHeight + cardGap;
             }
@@ -413,6 +494,22 @@ namespace RimMind.ModelService.Settings
             Widgets.EndScrollView();
             listing.End();
         }
+
+        internal static string TranslateOrFallback(string key, string fallback) =>
+            !string.IsNullOrEmpty(key) && key.CanTranslate() ? (string)key.Translate() : fallback;
+
+        private static string GetThinkingPolicyLabel(EndpointThinkingPolicy policy) => policy switch
+        {
+            EndpointThinkingPolicy.ForceEnabled => TranslateOrFallback("RimMind.ModelService.Endpoint.Thinking.ForceEnabled", "Thinking: On"),
+            EndpointThinkingPolicy.ForceDisabled => TranslateOrFallback("RimMind.ModelService.Endpoint.Thinking.ForceDisabled", "Thinking: Off"),
+            _ => TranslateOrFallback("RimMind.ModelService.Endpoint.Thinking.FollowRequest", "Thinking: Auto"),
+        };
+
+        private static string GetSafetyLevelLabel(EndpointSafetyLevel level) => level switch
+        {
+            EndpointSafetyLevel.High => TranslateOrFallback("RimMind.ModelService.Endpoint.Safety.High", "Safety: High"),
+            _ => TranslateOrFallback("RimMind.ModelService.Endpoint.Safety.Standard", "Safety: Standard"),
+        };
 
         internal static string GetProtocolDisplayLabel(IModelProtocol protocol)
         {

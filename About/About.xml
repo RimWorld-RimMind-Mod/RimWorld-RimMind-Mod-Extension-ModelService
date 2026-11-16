@@ -14,7 +14,7 @@ Enterprise multi-provider gateway, Anthropic Claude native protocol adapter, loc
 [b]v2.0 Clean Architecture &amp; RimWorld 1.6 / 1.7 Dual-Version Support:[/b]
 [list]
 [*][b]RimWorld 1.6 &amp; 1.7 (Waylith / .NET 10) Ready[/b]: Native multi-target compilation supporting both RimWorld 1.6 (.NET Framework 4.8) and RimWorld 1.7 (.NET 10 / Harmony 2.x &amp; 3.x).
-[*][b]Multi-Provider Protocol Adapters[/b]: Seamlessly routes across OpenAI-compatible APIs, native [b]Anthropic Claude Messages API[/b] (with [code]cache_control: ephemeral[/code]), [b]OpenCode Go[/b] subscription presets, and local subscription gateways ([b]Codex Proxy, Sub2API, NewAPI[/b]).
+[*][b]Multi-Provider Protocol Adapters[/b]: Seamlessly routes across [b]DeepSeek Official[/b] ([code]deepseek-flash[/code] / [code]deepseek-v4-pro[/code], native thinking, [code]safety_check[/code], TTS/ASR voice adapters), OpenAI-compatible APIs, native [b]Anthropic Claude Messages API[/b] (with [code]cache_control: ephemeral[/code]), [b]OpenCode Go[/b] subscription presets, and local subscription gateways ([b]Codex Proxy, Sub2API, NewAPI[/b]).
 [*][b]Failover Load Balancing &amp; Circuit Breaker[/b]: Supports [code]PriorityFailover[/code] and [code]RoundRobin[/code] routing across multiple endpoint nodes with 60-second automatic circuit isolation.
 [/list]
 
@@ -45,7 +45,7 @@ RimMind is an enterprise-grade, AI-powered RimWorld mod suite. Integrated with L
 
 [h2]Core Features[/h2]
 [list]
-[*][b]Multi-Provider Protocol Routing[/b] - Plugs directly into [code]RimMind-Core[/code]'s [code]IAIClientFactory[/code] registry to support [code]OpenAICompatible[/code], [code]AnthropicClaude[/code], [code]LocalSubscriptionGateway[/code], and [code]OpenCodeGo[/code] endpoints.
+[*][b]Multi-Provider Protocol Routing[/b] - Plugs directly into [code]RimMind-Core[/code]'s [code]IAIClientFactory[/code] and audio registries to support [code]DeepSeekOfficial[/code] (native thinking control, [code]safety_check[/code], [code]/v1/tools/tts[/code] and [code]/v1/tools/asr[/code]), [code]OpenAICompatible[/code], [code]AnthropicClaude[/code], [code]LocalSubscriptionGateway[/code], and [code]OpenCodeGo[/code] endpoints.
 [*][b]Anthropic Ephemeral KV-Cache Adapter[/b] - Native Anthropic [code]/v1/messages[/code] protocol support that automatically tags static Zone 1 &amp; Zone 2 prefix blocks with [code]cache_control: ephemeral[/code], slashing Claude latency and token costs.
 [*][b]OpenCode Go &amp; Local Gateway Presets[/b] - One-click setup for OpenCode Go ([code]https://opencode.ai/zen/go/v1[/code] with [code]x-opencode-session[/code] isolation) and local proxy gateways (Codex, Sub2API, NewAPI).
 [*][b]Local Loopback Security Guard ([code]LocalLoopbackValidator[/code])[/b] - Strictly verifies loopback addresses ([code]127.0.0.1[/code], [code]localhost[/code], [code]::1[/code]) for local subscription proxies to prevent accidental token leakage over public networks.
@@ -55,7 +55,8 @@ RimMind is an enterprise-grade, AI-powered RimWorld mod suite. Integrated with L
 [h2]Supported Gateway Modes[/h2]
 [table]
 [tr][th]Provider Mode[/th][th]Protocol &amp; Features[/th][th]Best Use Case[/th][/tr]
-[tr][td]OpenAICompatible[/td][td]Standard /v1/chat/completions with ToolCalls[/td][td]DeepSeek, OpenAI, OpenRouter, SiliconFlow, Ollama, vLLM[/td][/tr]
+[tr][td]OpenAICompatible[/td][td]Standard /v1/chat/completions with ToolCalls[/td][td]OpenAI, OpenRouter, SiliconFlow, Ollama, vLLM[/td][/tr]
+[tr][td]DeepSeekOfficial[/td][td]Native thinking, safety_check, 402 failover, TTS/ASR[/td][td]deepseek-flash / deepseek-v4-pro with adaptive reasoning[/td][/tr]
 [tr][td]AnthropicClaude[/td][td]Native /v1/messages + ephemeral prefix caching[/td][td]Claude 3.5 Sonnet / Haiku with hardware KV cache reuse[/td][/tr]
 [tr][td]LocalSubscriptionGateway[/td][td]Loopback-guarded local proxy (127.0.0.1 / ::1)[/td][td]Codex Proxy, Sub2API, NewAPI, CLIProxyAPI local gateways[/td][/tr]
 [tr][td]OpenCodeGo[/td][td]Session-isolated OpenCode Go cloud preset[/td][td]One-click OpenCode Go subscription routing[/td][/tr]

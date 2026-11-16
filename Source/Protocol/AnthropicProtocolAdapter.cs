@@ -214,6 +214,12 @@ namespace RimMind.ModelService.Protocol
                     return Result<LlmResponse, RimMindError>.Err(RimMindErrors.ClientPermanent(SecretRedactor.ForMessage(msg)));
                 }
 
+                if (string.Equals(token["stop_reason"]?.ToString(), "refusal", StringComparison.OrdinalIgnoreCase))
+                {
+                    return Result<LlmResponse, RimMindError>.Err(
+                        RimMindErrors.ContentFiltered("Anthropic model refused request (stop_reason=refusal)."));
+                }
+
                 var contentArray = token["content"] as JArray;
                 var textBuilder = new StringBuilder();
                 var reasoningBuilder = new StringBuilder();
@@ -260,6 +266,7 @@ namespace RimMind.ModelService.Protocol
 
                 int inputTokens = token["usage"]?["input_tokens"]?.Value<int>() ?? 0;
                 int outputTokens = token["usage"]?["output_tokens"]?.Value<int>() ?? 0;
+                int cacheReadTokens = token["usage"]?["cache_read_input_tokens"]?.Value<int>() ?? 0;
 
                 var response = new LlmResponse
                 {
@@ -269,6 +276,7 @@ namespace RimMind.ModelService.Protocol
                     ToolCallsJson = toolCallsJson,
                     PromptTokens = inputTokens,
                     CompletionTokens = outputTokens,
+                    CachedTokens = cacheReadTokens,
                     TokensUsed = inputTokens + outputTokens
                 };
 

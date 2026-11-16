@@ -1,7 +1,7 @@
 <div align="center">
 
 # RimMind-Extension-ModelService 🌐
-### Extended Model Gateways, OpenCode Go Subscription & Anthropic Prompt Caching for RimWorld 1.6 & 1.7
+### Extended Model Gateways, DeepSeek Native Dialect, Voice Services & Anthropic Caching for RimWorld 1.6 & 1.7
 
 **English** | [简体中文](README_zh.md)
 
@@ -12,7 +12,7 @@
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-yellow.svg" alt="License: MIT"></a>
 </p>
 
-<p><em>Enterprise multi-provider connectivity: OpenCode Go subscription, Anthropic ephemeral KV caching, local loopback gateways, and failover load balancing.</em></p>
+<p><em>Enterprise multi-provider connectivity: DeepSeek native thinking &amp; safety_check, OpenCode Go subscription, Anthropic ephemeral KV caching, TTS/ASR voice adapters, local loopback gateways, and failover load balancing.</em></p>
 
 </div>
 
@@ -23,6 +23,8 @@
 **RimMind-Extension-ModelService** extends `RimMind-Core` with advanced cloud subscription gateways, local loopback proxy security, cutting-edge caching protocols, and zero-downtime failover load balancing.
 
 ### Key Highlights
+- **DeepSeek Native Dialect & V4 Adaptation (`deepseek`)**: Implements `IContextualModelProtocol` (`DeepSeekProtocolAdapter` & `DeepSeekClientFactory`), translating Core `ReasoningEffort` into `thinking` + `reasoning_effort`, injecting `safety_check` + sanitized `user_id`, resolving parameter conflicts (`tool_choice`, `temperature`, `json_object`), preserving multi-turn tool `reasoning_content`, and mapping `402` billing failover + `400 Content Exists Risk` moderation without circuit breakage.
+- **DeepSeek Voice Services (`ISpeechSynthesizer` / `ISpeechRecognizer`)**: Registers orthogonal `/v1/tools/tts` (`DeepSeekSpeechSynthesizer`) and `/v1/tools/asr` (`DeepSeekSpeechRecognizer`) adapters into `RimMindAPI.Ext`.
 - **OpenCode Go Subscription Direct Access**: One-click subscription preset (`https://opencode.ai/zen/go/v1`) via `OpenCodeGoClientFactory` with automatic session isolation headers (`x-opencode-session`).
 - **Anthropic Protocol Adapter**: Implements native Anthropic `messages` protocol with `cache_control: {"type": "ephemeral"}` markings on static L0/L1 prefix layers, maximizing hardware-level KV cache reuse.
 - **Local Subscription Loopback Security**: Strictly enforces loopback binding (`127.0.0.1`, `localhost`, `::1`) via `LocalLoopbackValidator` for local subscription gateways (Codex, Sub2API, NewAPI), preventing accidental credential leakage over public networks.
@@ -72,7 +74,8 @@ Configurable via **Options -> Mod Settings -> RimMind - Extended Model Service**
 |---|---|---|
 | **Enable Extended Service** | `Enabled` | Master switch gating `extended_service` multi-endpoint routing |
 | **Balancing Strategy** | `PriorityFailover` | Route by priority order (`PriorityFailover`) or distribute evenly (`RoundRobin`) |
-| **Provider Type** | `OpenAICompatible` | Protocol adapter (`OpenAICompatible`, `AnthropicClaude`, `LocalSubscriptionGateway`, `OpenCodeGo`) |
+| **Provider Type** | `OpenAICompatible` | Protocol adapter (`OpenAICompatible`, `AnthropicClaude`, `DeepSeekOfficial`, `LocalSubscriptionGateway`, `OpenCodeGo`) |
+| **Thinking & Safety (DeepSeek)** | `Auto / High` | Per-endpoint `thinkingPolicy` (`FollowRequest`, `ForceEnabled`, `ForceDisabled`) and `safetyLevel` (`Standard`, `High`) |
 | **Endpoint Priority & Enabled** | `1 / Enabled` | Per-endpoint priority weight and active participation toggle |
 | **One-Click Latency Ping** | — | Asynchronous HTTP health probe measuring RTT latency and updating endpoint health |
 
