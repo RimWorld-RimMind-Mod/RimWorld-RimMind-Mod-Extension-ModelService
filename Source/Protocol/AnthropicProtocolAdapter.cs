@@ -4,6 +4,7 @@ using System.Linq;
 using System.Text;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
+using RimMind.Application.Features.Llm;
 using RimMind.Domain.Common;
 using RimMind.Domain.Llm;
 using RimMind.Domain.ValueObjects;
@@ -23,39 +24,25 @@ namespace RimMind.ModelService.Protocol
                 ["temperature"] = envelope.Temperature
             };
 
-            // 1. Anthropic separates system prompts into a top-level string.
-            // Extract only static system prompts (L0/L1) to keep the top-level system prompt 100% cache-stable!
-            var staticSystemPrompts = envelope.Messages?
-                .Where(m => m.Role == "system" && m.LayerTag != "L2" && m.LayerTag != "L3" && m.LayerTag != "L5" && !string.IsNullOrWhiteSpace(m.Content))
-                .Select(m => m.Content)
-                .ToList();
-
-            if (staticSystemPrompts != null && staticSystemPrompts.Count > 0)
+            // 1. Partition 4-Zone KV-cache layers via Core's shared PromptZonePartitioner so
+            // static system prompts (L0/L1) stay top-level cache-stable while volatile observations
+            // (L2/L3/L5) attach to the active user turn.
+            var partition = PromptZonePartitioner.Partition(envelope);
+            if (!string.IsNullOrEmpty(partition.CombinedStaticSystemPrompt))
             {
-                root["system"] = string.Join("\n\n", staticSystemPrompts);
+                root["system"] = partition.CombinedStaticSystemPrompt;
             }
 
-            // Extract volatile observations (L2/L3/L5) to append to the active user message
-            var volatileObservations = envelope.Messages?
-                .Where(m => m.Role == "system" && (m.LayerTag == "L2" || m.LayerTag == "L3" || m.LayerTag == "L5") && !string.IsNullOrWhiteSpace(m.Content))
-                .Select(m => m.Content)
-                .ToList();
-            string? observationPrefix = (volatileObservations != null && volatileObservations.Count > 0)
-                ? string.Join("\n\n", volatileObservations)
-                : null;
+            string? observationPrefix = partition.CombinedVolatileObservation;
 
-            // 2. Format messages
+            // 2. Format messages (few-shot examples precede the live conversation)
             var messagesArray = new JArray();
             if (envelope.Messages != null && envelope.Messages.Count > 0)
             {
-                var liveMessages = envelope.Messages.Where(m => m != null && m.Role != "system").ToList();
-                var lastUserMsgRef = liveMessages.LastOrDefault(m => m.Role == "user");
-
-                // Few-shot examples precede the live conversation (same placement as Core's OpenAI serializer).
-                var nonSystemMessages = new List<ChatMessage>();
-                if (envelope.Examples != null)
-                    nonSystemMessages.AddRange(envelope.Examples.Where(ex => ex != null && ex.Role != "system"));
-                nonSystemMessages.AddRange(liveMessages);
+                var lastUserMsgRef = partition.LastUserMessage;
+                var nonSystemMessages = new List<ChatMessage>(partition.Examples.Count + partition.LiveNonSystemMessages.Count);
+                nonSystemMessages.AddRange(partition.Examples);
+                nonSystemMessages.AddRange(partition.LiveNonSystemMessages);
 
                 JObject? lastUserMsg = null;
                 foreach (var msg in nonSystemMessages)

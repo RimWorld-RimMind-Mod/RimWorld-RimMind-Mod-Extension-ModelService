@@ -1,14 +1,10 @@
 using System;
-using System.Diagnostics;
 using System.Threading.Tasks;
-using RimMind.Application.Common.Interfaces;
-using RimMind.Presentation.Api;
+using LudeonTK;
 using RimMind.ModelService.Diagnostics;
 using RimMind.ModelService.Models;
-using RimMind.ModelService.Settings;
-using LudeonTK;
+using RimMind.Presentation.Api;
 using RimWorld;
-using UnityEngine;
 using Verse;
 
 namespace RimMind.ModelService.Debug
@@ -22,11 +18,22 @@ namespace RimMind.ModelService.Debug
             var snapshot = settings?.GetEndpointsSnapshot() ?? Array.Empty<ModelEndpointConfig>();
             if (snapshot.Length == 0)
             {
-                Messages.Message("RimMind.ModelService.Debug.NoEndpoints".Translate(), MessageTypeDefOf.NeutralEvent, false);
+                Messages.Message(
+                    RimMindText.TrOr(
+                        "RimMind.ModelService.Debug.NoEndpoints",
+                        "[ModelService] No endpoints configured. Please add preset nodes in Mod Settings."),
+                    MessageTypeDefOf.NeutralEvent,
+                    false);
                 return;
             }
 
-            Messages.Message("RimMind.ModelService.Debug.ProbingAll".Translate(snapshot.Length), MessageTypeDefOf.NeutralEvent, false);
+            Messages.Message(
+                RimMindText.TrOr(
+                    "RimMind.ModelService.Debug.ProbingAll",
+                    "[ModelService] Probing all {0} model service node(s)...",
+                    snapshot.Length),
+                MessageTypeDefOf.NeutralEvent,
+                false);
 
             foreach (var node in snapshot)
             {
@@ -41,11 +48,26 @@ namespace RimMind.ModelService.Debug
                     {
                         if (isOk)
                         {
-                            Messages.Message("RimMind.ModelService.Debug.ProbeSuccess".Translate(targetNode.name, targetNode.modelName, rttMs), MessageTypeDefOf.PositiveEvent, false);
+                            Messages.Message(
+                                RimMindText.TrOr(
+                                    "RimMind.ModelService.Debug.ProbeSuccess",
+                                    "[ModelService] {0} ({1}): latency {2}ms (Connected)",
+                                    targetNode.name,
+                                    targetNode.modelName,
+                                    rttMs),
+                                MessageTypeDefOf.PositiveEvent,
+                                false);
                         }
                         else
                         {
-                            Messages.Message("RimMind.ModelService.Debug.ProbeFailed".Translate(targetNode.name, error), MessageTypeDefOf.NegativeEvent, false);
+                            Messages.Message(
+                                RimMindText.TrOr(
+                                    "RimMind.ModelService.Debug.ProbeFailed",
+                                    "[ModelService] {0}: Failed - {1}",
+                                    targetNode.name,
+                                    error),
+                                MessageTypeDefOf.NegativeEvent,
+                                false);
                         }
                     });
                 });

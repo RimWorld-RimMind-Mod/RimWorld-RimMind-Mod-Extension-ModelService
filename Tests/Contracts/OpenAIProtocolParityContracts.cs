@@ -1,9 +1,8 @@
 using System;
 using System.Collections.Generic;
 using Newtonsoft.Json.Linq;
+using RimMind.Application.Features.Llm;
 using RimMind.Domain.Llm;
-using RimMind.Infrastructure.Services.Clients.OpenAI;
-using RimMind.Infrastructure.Services.Clients.Shared;
 using RimMind.ModelService.Models;
 using RimMind.ModelService.Protocol;
 using RimMind.ModelService.Security;
@@ -13,9 +12,8 @@ using Xunit;
 namespace RimMind.ModelService.Tests.Contracts
 {
     /// <summary>
-    /// Golden-JSON parity between ModelService's OpenAI adapter and Core's built-in serializer.
-    /// Core's internal <c>OpenAIRequestSerializer</c> and <c>LogSanitizer</c> are compiled into this
-    /// test assembly (test-only source links) so both outputs are compared byte-for-byte.
+    /// Golden-JSON parity between ModelService's OpenAI adapter and Core's public
+    /// <see cref="OpenAIWireCodec"/> and <see cref="LogSecretRedactor"/>.
     /// </summary>
     public class OpenAIProtocolParityContracts
     {
@@ -73,7 +71,7 @@ namespace RimMind.ModelService.Tests.Contracts
         };
 
         private static string Core(LlmRequestEnvelope envelope) =>
-            OpenAIRequestSerializer.BuildRequestJson(envelope, Model, defaultMaxTokens: 0);
+            OpenAIWireCodec.BuildRequestJson(envelope, Model, defaultMaxTokens: 0);
 
         [Fact]
         public void OpenAI_request_wire_format_matches_core_serializer()
@@ -275,10 +273,10 @@ namespace RimMind.ModelService.Tests.Contracts
             };
 
             ContractCaseRunner.Run(
-                ("every corpus line redacts exactly like Core's LogSanitizer", () =>
+                ("every corpus line redacts exactly like Core's LogSecretRedactor", () =>
                 {
                     foreach (var line in corpus)
-                        Assert.Equal(LogSanitizer.Redact(line), SecretRedactor.Redact(line));
+                        Assert.Equal(LogSecretRedactor.Redact(line), SecretRedactor.Redact(line));
                 }),
                 ("shapes the previous ModelService regex leaked are now masked", () =>
                 {
@@ -295,7 +293,7 @@ namespace RimMind.ModelService.Tests.Contracts
                 ("messages are truncated with Core's length marker after redaction", () =>
                 {
                     string longText = new string('a', 600);
-                    Assert.Equal(LogSanitizer.ForLog(longText), SecretRedactor.ForMessage(longText));
+                    Assert.Equal(LogSecretRedactor.ForLog(longText), SecretRedactor.ForMessage(longText));
                 }));
         }
     }

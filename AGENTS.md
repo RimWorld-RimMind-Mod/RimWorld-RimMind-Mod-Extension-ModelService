@@ -38,38 +38,40 @@ Source/
 ├── RimMindModelServiceMod.cs              Mod 入口，注册 deepseek_native / opencode / extended_service 工厂、TTS/ASR 扩展及设置页签
 ├── Audio/
 │   ├── DeepSeekAudioEndpointResolver.cs  解析生效 DeepSeek 节点/环境变量基址与凭据
-│   ├── DeepSeekSpeechRecognizer.cs       ISpeechRecognizer 实现（POST /v1/tools/asr multipart/form-data + hotwords）
-│   └── DeepSeekSpeechSynthesizer.cs      ISpeechSynthesizer 实现（POST /v1/tools/tts 文本清洗与 2000 字符守卫）
+│   ├── DeepSeekSpeechRecognizer.cs       ISpeechRecognizer 实现（POST /v1/tools/asr multipart/form-data，共享 RimMindHttpClientPool.Shared）
+│   └── DeepSeekSpeechSynthesizer.cs      ISpeechSynthesizer 实现（POST /v1/tools/tts 文本清洗与计费守卫，共享 RimMindHttpClientPool.Shared）
 ├── Balancing/
-│   └── LoadBalancer.cs                   多端点调度（Priority Failover / 加权 Round Robin）与熔断隔离恢复
+│   └── LoadBalancer.cs                   多端点调度（Priority Failover / 加权 Round Robin），集成 Core EndpointFailoverPolicy 熔断与恢复
 ├── Client/
 │   ├── DeepSeekClientFactory.cs          deepseek_native 官方直连工厂（透传 ModelService DeepSeek 池或回落 Core 设置）
-│   ├── EnvironmentEndpointOverlay.cs     自动化环境变量非持久化 shadow 凭据覆盖层（不污染 ModSettings）
-│   ├── ModelServiceClient.cs             IAIClient 多端点客户端（单节点超时、失败时刻熔断、风控/配额分流与密钥脱敏）
+│   ├── EnvironmentEndpointOverlay.cs     自动化环境变量非持久化 shadow 凭据覆盖层（数据驱动按 protocolId 匹配，不污染 ModSettings）
+│   ├── ModelServiceClient.cs             IAIClient 多端点客户端（共享 RimMindHttpClientPool.NoRedirect、能力驱动回环/URI 解析、Core HttpErrorClassifier + EndpointFailoverPolicy、SendStreamAsync 分块回传）
 │   ├── ModelServiceClientFactory.cs      extended_service 提供商工厂（受 enableService 门控 + EnvironmentEndpointOverlay）
 │   └── OpenCodeGoClientFactory.cs        opencode 订阅直连提供商工厂（自动注入 x-opencode-session）
 ├── Debug/
-│   └── ModelServiceDebugActions.cs       DebugAction 批量端点探活诊断（GetEndpointsSnapshot 快照 + MainThread.Post 回调）
+│   └── ModelServiceDebugActions.cs       DebugAction 批量端点探活诊断（GetEndpointsSnapshot + MainThread.Post + RimMindText.TrOr）
 ├── Diagnostics/
-│   └── EndpointHealthProbe.cs            异步 HTTP 连通与 RTT 延迟探针（区分 401/403 未授权与 5xx/网络异常）
+│   └── EndpointHealthProbe.cs            异步 HTTP 连通与 RTT 延迟探针（共享 RimMindHttpClientPool.NoRedirect + 15s 超时、能力驱动回环校验）
 ├── Integration/
 │   └── ModelServiceSettingsTab.cs        ISettingsTab 扩展设置页签注册
 ├── Models/
-│   ├── ModelEndpointConfig.cs            端点配置模型（含 thinkingPolicy / safetyLevel）、Scribe 持久化与 IsolateImmediately
+│   ├── ModelEndpointConfig.cs            端点配置模型（含 thinkingPolicy / safetyLevel / SuccessGeneration）、Scribe 持久化与 IsolateImmediately
 │   ├── ModelEndpointPresets.cs           Codex 本地网关、OpenCode Go 与 DeepSeek 官方预设工厂
 │   └── ProviderType.cs                   协议类型、负载均衡策略、思考模式与安全等级枚举
 ├── Protocol/
-│   ├── AnthropicProtocolAdapter.cs       Anthropic Claude 原生 messages 协议、refusal 识别与 ephemeral 缓存适配
-│   ├── DeepSeekProtocolAdapter.cs        DeepSeek V4 原生方言适配器（thinking/safety_check/冲突消解/工具历史推理链）
-│   ├── HttpErrorClassifier.cs            统一 HTTP 错误分流（ContentFiltered / ClientQuotaOrAuth / Transient / Permanent）
-│   ├── IModelProtocol.cs                 IModelProtocol、ProtocolCapabilities 与 IContextualModelProtocol 协议契约
-│   ├── ModelProtocolRegistry.cs          协议注册表及 OpenAI / Anthropic / LocalGateway / OpenCodeGo / DeepSeek 协议实现
-│   └── OpenAIProtocolAdapter.cs          OpenAI 兼容报文与 ToolCall 互转适配器
+│   ├── AnthropicProtocolAdapter.cs       Anthropic Claude 原生 messages 协议（复用 Core PromptZonePartitioner 分区、refusal 与 ephemeral 缓存）
+│   ├── DeepSeekProtocolAdapter.cs        DeepSeek V4 原生方言适配器（通过 Core OpenAIWireCodec 单次 customizePayload 钩子与 EnsureJsonKeyword 实现）
+│   ├── HttpErrorClassifier.cs            Core HttpErrorClassifier 的轻量兼容转发层（候选清理文件）
+│   ├── IModelProtocol.cs                 IModelProtocol（含 Capabilities / ResolveCompletionUri）、ProtocolCapabilities 与 IContextualModelProtocol 契约
+│   ├── ModelProtocolRegistry.cs          纯泛型协议注册表与旧版 ProviderType 别名映射
+│   ├── OpenAIProtocolAdapter.cs          OpenAI 兼容报文适配器（直接委托 Core 公共 OpenAIWireCodec）
+│   └── Protocols/                        独立具体协议实现（OpenAI / LocalGateway / OpenCodeGo / Anthropic / DeepSeek）
 ├── Security/
-│   └── LocalLoopbackValidator.cs         本机回环安全检查与公网泄露拦截
+│   ├── LocalLoopbackValidator.cs         本机回环安全检查与公网泄露拦截
+│   └── SecretRedactor.cs                 凭证脱敏封装（直接委托 Core 公共 LogSecretRedactor）
 └── Settings/
     ├── ModelServiceSettings.cs           Scribe 存档配置、EndpointSyncRoot 锁对象与 GetEndpointsSnapshot 快照
-    └── ModelServiceSettingsDrawer.cs     Mod 设置界面（含 DeepSeek 预设、Thinking/Safety 选择器、Tooltip 与一键 Ping 诊断）
+    └── ModelServiceSettingsDrawer.cs     Mod 设置界面（SettingsUIDrawer.DrawScrollableSettingsPage 脏写门控 + DrawSecretField + 能力驱动控件 + RimMindText.TrOr）
 ```
 
 ## 关键安全与并发契约

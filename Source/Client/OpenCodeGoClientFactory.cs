@@ -12,7 +12,7 @@ namespace RimMind.ModelService.Client
         public const string OpenCodeProviderId = "opencode";
 
         public string Id => OpenCodeProviderId;
-        public string OwnerModId => "mcocdaa.RimMindModelService";
+        public string OwnerModId => ModelServiceClientFactory.ModelServiceOwnerModId;
         public string ProviderId => OpenCodeProviderId;
         public bool RequiresApiKey => true;
 

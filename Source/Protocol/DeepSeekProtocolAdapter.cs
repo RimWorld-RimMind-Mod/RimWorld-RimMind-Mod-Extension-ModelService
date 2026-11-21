@@ -1,11 +1,10 @@
 using System;
 using System.Text;
-using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
+using RimMind.Application.Features.Llm;
 using RimMind.Domain.Common;
 using RimMind.Domain.Llm;
 using RimMind.Domain.ValueObjects;
-using RimMind.Infrastructure.Services.Clients.OpenAI;
 using RimMind.ModelService.Models;
 
 namespace RimMind.ModelService.Protocol
@@ -16,6 +15,7 @@ namespace RimMind.ModelService.Protocol
     /// translates engine-agnostic <see cref="ReasoningEffort"/> into DeepSeek <c>thinking</c> + <c>reasoning_effort</c>,
     /// injects <c>safety_check</c> and sanitized <c>user_id</c>, resolves parameter conflicts,
     /// preserves assistant <c>reasoning_content</c> on multi-turn tool calls, and parses keep-alive/risk responses.
+    /// Uses <see cref="OpenAIWireCodec"/>'s single-pass <c>customizePayload</c> hook to avoid double JSON round-trips.
     /// </summary>
     public static class DeepSeekProtocolAdapter
     {
@@ -63,17 +63,30 @@ namespace RimMind.ModelService.Protocol
                 out string? reasoningEffortWire);
 
             bool safetyHigh = endpoint != null && endpoint.safetyLevel == EndpointSafetyLevel.High;
+            string? sanitizedUserId = SanitizeUserId(envelope.NpcId);
 
-            string baseJson = OpenAIRequestSerializer.BuildRequestJson(
+            return OpenAIWireCodec.BuildRequestJson(
                 envelope,
                 normalizedModel,
                 defaultMaxTokens: 0,
                 stream: false,
                 forceJsonMode: false,
-                omitZeroMaxTokens: true);
+                omitZeroMaxTokens: true,
+                customizePayload: root => ApplyDeepSeekDialect(
+                    root,
+                    thinkingEnabled,
+                    reasoningEffortWire,
+                    safetyHigh,
+                    sanitizedUserId));
+        }
 
-            var root = JObject.Parse(baseJson);
-
+        private static void ApplyDeepSeekDialect(
+            JObject root,
+            bool thinkingEnabled,
+            string? reasoningEffortWire,
+            bool safetyHigh,
+            string? sanitizedUserId)
+        {
             root["thinking"] = new JObject
             {
                 ["type"] = thinkingEnabled ? "enabled" : "disabled"
@@ -91,7 +104,6 @@ namespace RimMind.ModelService.Protocol
                 };
             }
 
-            string? sanitizedUserId = SanitizeUserId(envelope.NpcId);
             if (!string.IsNullOrEmpty(sanitizedUserId))
             {
                 root["user_id"] = sanitizedUserId;
@@ -119,7 +131,7 @@ namespace RimMind.ModelService.Protocol
                     root["response_format"] = new JObject { ["type"] = "json_object" };
                     if (messages != null)
                     {
-                        EnsureJsonKeyword(messages);
+                        OpenAIWireCodec.EnsureJsonKeyword(messages);
                     }
                 }
             }
@@ -138,8 +150,6 @@ namespace RimMind.ModelService.Protocol
                     }
                 }
             }
-
-            return root.ToString(Formatting.None);
         }
 
         public static Result<LlmResponse, RimMindError> ParseResponse(
@@ -150,7 +160,7 @@ namespace RimMind.ModelService.Protocol
                 return Result<LlmResponse, RimMindError>.Err(
                     RimMindErrors.ClientTransient("Empty response body from DeepSeek server."));
 
-            return OpenAIRequestSerializer.ParseResponse(responseBody.Trim(), envelope);
+            return OpenAIWireCodec.ParseResponse(responseBody.Trim(), envelope);
         }
 
         private static void ResolveThinkingControl(
@@ -229,39 +239,6 @@ namespace RimMind.ModelService.Protocol
 
             string result = sb.ToString().Trim('_');
             return result.Length > 0 ? result : null;
-        }
-
-        private static void EnsureJsonKeyword(JArray messages)
-        {
-            for (int i = 0; i < messages.Count; i++)
-            {
-                if (messages[i] is JObject msgObj)
-                {
-                    string? content = msgObj["content"]?.ToString();
-                    if (!string.IsNullOrEmpty(content) &&
-                        content!.IndexOf("json", StringComparison.OrdinalIgnoreCase) >= 0)
-                    {
-                        return;
-                    }
-                }
-            }
-
-            for (int i = messages.Count - 1; i >= 0; i--)
-            {
-                if (messages[i] is JObject msgObj &&
-                    string.Equals(msgObj["role"]?.ToString(), "system", StringComparison.OrdinalIgnoreCase))
-                {
-                    string existing = msgObj["content"]?.ToString() ?? string.Empty;
-                    msgObj["content"] = existing + "\n\nPlease respond in JSON format.";
-                    return;
-                }
-            }
-
-            messages.Insert(0, new JObject
-            {
-                ["role"] = "system",
-                ["content"] = "Please respond in JSON format."
-            });
         }
     }
 }

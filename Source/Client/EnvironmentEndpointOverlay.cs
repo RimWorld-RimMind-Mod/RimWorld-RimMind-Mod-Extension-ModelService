@@ -7,70 +7,93 @@ using RimMind.ModelService.Protocol;
 namespace RimMind.ModelService.Client
 {
     /// <summary>
-    /// Applies automation credentials from environment variables (RIMMIND_TEST_* / RIMMIND_BACKUP_*) to
-    /// OpenCodeGo endpoints that have no API key, WITHOUT mutating the persisted <see cref="ModelEndpointConfig"/>
-    /// objects. Previously the factory wrote these values into the live ModSettings, so the next settings save
-    /// stored the secret in plain text and overwrote the player's endpoint URL and model.
-    /// Shadow copies are cached per endpoint id so runtime health/circuit-breaker state survives across requests.
+    /// Applies automation credentials from environment variables (e.g. RIMMIND_TEST_* / RIMMIND_BACKUP_* /
+    /// RIMMIND_DEEPSEEK_*) to key-less matching endpoints WITHOUT mutating persisted <see cref="ModelEndpointConfig"/>
+    /// objects. Shadow copies are cached per endpoint id so runtime health/circuit-breaker state survives across requests.
     /// </summary>
     internal sealed class EnvironmentEndpointOverlay
     {
-        private readonly string? _apiKey;
-        private readonly string? _endpoint;
-        private readonly string? _model;
-        private readonly string? _deepSeekApiKey;
-        private readonly string? _deepSeekEndpoint;
-        private readonly string? _deepSeekModel;
+        internal sealed class ProtocolEnvOverride
+        {
+            public ProtocolEnvOverride(string apiKey, string? endpoint, string? model)
+            {
+                ApiKey = apiKey;
+                Endpoint = endpoint;
+                Model = model;
+            }
+
+            public string ApiKey { get; }
+            public string? Endpoint { get; }
+            public string? Model { get; }
+        }
+
+        private sealed class ProtocolEnvBinding
+        {
+            public ProtocolEnvBinding(
+                string protocolId,
+                string[] apiKeyVars,
+                string[] endpointVars,
+                string[] modelVars)
+            {
+                ProtocolId = protocolId;
+                ApiKeyVars = apiKeyVars;
+                EndpointVars = endpointVars;
+                ModelVars = modelVars;
+            }
+
+            public string ProtocolId { get; }
+            public string[] ApiKeyVars { get; }
+            public string[] EndpointVars { get; }
+            public string[] ModelVars { get; }
+        }
+
+        private static readonly ProtocolEnvBinding[] DefaultBindings =
+        {
+            new ProtocolEnvBinding(
+                ModelProtocolRegistry.OpenCodeGoProtocolId,
+                new[] { "RIMMIND_BACKUP_API_KEY", "RIMMIND_TEST_API_KEY" },
+                new[] { "RIMMIND_BACKUP_ENDPOINT", "RIMMIND_TEST_ENDPOINT" },
+                new[] { "RIMMIND_BACKUP_MODEL", "RIMMIND_TEST_MODEL" }),
+            new ProtocolEnvBinding(
+                ModelProtocolRegistry.DeepSeekProtocolId,
+                new[] { "RIMMIND_DEEPSEEK_API_KEY", "DEEPSEEK_API_KEY" },
+                new[] { "RIMMIND_DEEPSEEK_ENDPOINT" },
+                new[] { "RIMMIND_DEEPSEEK_MODEL" })
+        };
+
+        private readonly Dictionary<string, ProtocolEnvOverride> _overridesByProtocol;
         private readonly ConcurrentDictionary<string, ModelEndpointConfig> _shadows =
             new ConcurrentDictionary<string, ModelEndpointConfig>(StringComparer.Ordinal);
 
-        private EnvironmentEndpointOverlay(
-            string? apiKey,
-            string? endpoint,
-            string? model,
-            string? deepSeekApiKey,
-            string? deepSeekEndpoint,
-            string? deepSeekModel)
+        private EnvironmentEndpointOverlay(Dictionary<string, ProtocolEnvOverride> overridesByProtocol)
         {
-            _apiKey = apiKey;
-            _endpoint = endpoint;
-            _model = model;
-            _deepSeekApiKey = deepSeekApiKey;
-            _deepSeekEndpoint = deepSeekEndpoint;
-            _deepSeekModel = deepSeekModel;
+            _overridesByProtocol = overridesByProtocol;
         }
 
         /// <summary>Returns null when no automation key is present in the environment.</summary>
         public static EnvironmentEndpointOverlay? FromEnvironment(Func<string, string?>? getEnv = null)
         {
             getEnv ??= Environment.GetEnvironmentVariable;
-            string? testKey = getEnv("RIMMIND_TEST_API_KEY");
-            string? backupKey = getEnv("RIMMIND_BACKUP_API_KEY");
-            string? key = !string.IsNullOrWhiteSpace(backupKey) ? backupKey : testKey;
+            var overrides = new Dictionary<string, ProtocolEnvOverride>(StringComparer.OrdinalIgnoreCase);
 
-            string? deepSeekKey = getEnv("RIMMIND_DEEPSEEK_API_KEY");
-            if (string.IsNullOrWhiteSpace(deepSeekKey))
-                deepSeekKey = getEnv("DEEPSEEK_API_KEY");
+            for (int i = 0; i < DefaultBindings.Length; i++)
+            {
+                var binding = DefaultBindings[i];
+                string? key = FirstNonWhiteSpace(getEnv, binding.ApiKeyVars);
+                if (string.IsNullOrWhiteSpace(key))
+                    continue;
 
-            if (string.IsNullOrWhiteSpace(key) && string.IsNullOrWhiteSpace(deepSeekKey))
-                return null;
+                string? endpoint = FirstNonNull(getEnv, binding.EndpointVars);
+                string? model = FirstNonNull(getEnv, binding.ModelVars);
+                overrides[binding.ProtocolId] = new ProtocolEnvOverride(key!, endpoint, model);
+            }
 
-            string? endpoint = getEnv("RIMMIND_BACKUP_ENDPOINT") ?? getEnv("RIMMIND_TEST_ENDPOINT");
-            string? model = getEnv("RIMMIND_BACKUP_MODEL") ?? getEnv("RIMMIND_TEST_MODEL");
-            string? deepSeekEndpoint = getEnv("RIMMIND_DEEPSEEK_ENDPOINT");
-            string? deepSeekModel = getEnv("RIMMIND_DEEPSEEK_MODEL");
-            return new EnvironmentEndpointOverlay(
-                string.IsNullOrWhiteSpace(key) ? null : key,
-                endpoint,
-                model,
-                string.IsNullOrWhiteSpace(deepSeekKey) ? null : deepSeekKey,
-                deepSeekEndpoint,
-                deepSeekModel);
+            return overrides.Count > 0 ? new EnvironmentEndpointOverlay(overrides) : null;
         }
 
         /// <summary>
-        /// Returns a new list in which key-less OpenCodeGo or DeepSeek endpoints are replaced by cached shadow
-        /// copies carrying environment credentials. The source list and its elements are never modified.
+        /// Returns a new list in which key-less endpoints matching a configured protocol override are replaced
+        /// by cached shadow copies carrying environment credentials. Source elements are never modified.
         /// </summary>
         public IReadOnlyList<ModelEndpointConfig> Apply(IReadOnlyList<ModelEndpointConfig> source)
         {
@@ -91,28 +114,12 @@ namespace RimMind.ModelService.Client
                 if (ep == null)
                     continue;
 
-                if (!string.IsNullOrEmpty(ep.apiKey))
+                if (!string.IsNullOrEmpty(ep.apiKey) ||
+                    !_overridesByProtocol.TryGetValue(ep.EffectiveProtocolId, out var protocolOverride))
                 {
                     result.Add(ep);
                     continue;
                 }
-
-                bool isOpenCodeMatch =
-                    string.Equals(ep.EffectiveProtocolId, ModelProtocolRegistry.OpenCodeGoProtocolId, StringComparison.OrdinalIgnoreCase) &&
-                    !string.IsNullOrWhiteSpace(_apiKey);
-                bool isDeepSeekMatch =
-                    string.Equals(ep.EffectiveProtocolId, ModelProtocolRegistry.DeepSeekProtocolId, StringComparison.OrdinalIgnoreCase) &&
-                    !string.IsNullOrWhiteSpace(_deepSeekApiKey);
-
-                if (!isOpenCodeMatch && !isDeepSeekMatch)
-                {
-                    result.Add(ep);
-                    continue;
-                }
-
-                string overlayKey = isDeepSeekMatch ? _deepSeekApiKey! : _apiKey!;
-                string? overlayEndpoint = isDeepSeekMatch ? _deepSeekEndpoint : _endpoint;
-                string? overlayModel = isDeepSeekMatch ? _deepSeekModel : _model;
 
                 var shadow = _shadows.GetOrAdd(ep.id ?? string.Empty, _ => new ModelEndpointConfig());
                 shadow.id = ep.id ?? string.Empty;
@@ -125,13 +132,35 @@ namespace RimMind.ModelService.Client
                 shadow.isEnabled = ep.isEnabled;
                 shadow.thinkingPolicy = ep.thinkingPolicy;
                 shadow.safetyLevel = ep.safetyLevel;
-                shadow.apiKey = overlayKey;
-                shadow.endpoint = string.IsNullOrEmpty(overlayEndpoint) ? ep.endpoint : overlayEndpoint!;
-                shadow.modelName = string.IsNullOrEmpty(overlayModel) ? ep.modelName : overlayModel!;
+                shadow.apiKey = protocolOverride.ApiKey;
+                shadow.endpoint = string.IsNullOrEmpty(protocolOverride.Endpoint) ? ep.endpoint : protocolOverride.Endpoint!;
+                shadow.modelName = string.IsNullOrEmpty(protocolOverride.Model) ? ep.modelName : protocolOverride.Model!;
                 result.Add(shadow);
             }
 
             return result;
+        }
+
+        private static string? FirstNonWhiteSpace(Func<string, string?> getEnv, string[] names)
+        {
+            for (int i = 0; i < names.Length; i++)
+            {
+                string? val = getEnv(names[i]);
+                if (!string.IsNullOrWhiteSpace(val))
+                    return val;
+            }
+            return null;
+        }
+
+        private static string? FirstNonNull(Func<string, string?> getEnv, string[] names)
+        {
+            for (int i = 0; i < names.Length; i++)
+            {
+                string? val = getEnv(names[i]);
+                if (val != null)
+                    return val;
+            }
+            return null;
         }
     }
 }

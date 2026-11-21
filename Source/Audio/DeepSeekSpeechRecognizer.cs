@@ -7,12 +7,13 @@ using System.Threading;
 using System.Threading.Tasks;
 using Newtonsoft.Json.Linq;
 using RimMind.Application.Common.Interfaces.Audio;
+using RimMind.Application.Features.Llm;
 using RimMind.Domain.Audio;
 using RimMind.Domain.Common;
 using RimMind.Domain.ValueObjects;
 using RimMind.ModelService.Client;
-using RimMind.ModelService.Protocol;
 using RimMind.ModelService.Security;
+using CoreHttpErrorClassifier = RimMind.Application.Features.Llm.HttpErrorClassifier;
 
 namespace RimMind.ModelService.Audio
 {
@@ -22,11 +23,7 @@ namespace RimMind.ModelService.Audio
     public sealed class DeepSeekSpeechRecognizer : ISpeechRecognizer
     {
         public const int MaxAudioBytes = 8 * 1024 * 1024;
-
-        private static readonly HttpClient SharedHttpClient = new HttpClient
-        {
-            Timeout = TimeSpan.FromSeconds(60)
-        };
+        private const int RequestTimeoutSeconds = 60;
 
         private readonly Func<HttpRequestMessage, CancellationToken, Task<HttpResponseMessage>> _httpSend;
         private readonly Func<(string rootBaseUrl, string apiKey)?> _credentialResolver;
@@ -40,7 +37,7 @@ namespace RimMind.ModelService.Audio
             Func<HttpRequestMessage, CancellationToken, Task<HttpResponseMessage>>? httpSendOverride,
             Func<(string rootBaseUrl, string apiKey)?>? credentialResolver = null)
         {
-            _httpSend = httpSendOverride ?? ((req, ct) => SharedHttpClient.SendAsync(req, ct));
+            _httpSend = httpSendOverride ?? ((req, ct) => RimMindHttpClientPool.Shared.SendAsync(req, ct));
             _credentialResolver = credentialResolver ?? DeepSeekAudioEndpointResolver.Resolve;
         }
 
@@ -81,6 +78,8 @@ namespace RimMind.ModelService.Audio
 
             try
             {
+                using var timeoutCts = new CancellationTokenSource(TimeSpan.FromSeconds(RequestTimeoutSeconds));
+                using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(request.Ct, timeoutCts.Token);
                 using var multipart = new MultipartFormDataContent();
                 var fileContent = new ByteArrayContent(request.AudioBytes);
                 fileContent.Headers.ContentType = new MediaTypeHeaderValue(ResolveMimeType(request.Format));
@@ -90,7 +89,7 @@ namespace RimMind.ModelService.Audio
                 httpReq.Headers.TryAddWithoutValidation("Authorization", "Bearer " + apiKey);
                 httpReq.Content = multipart;
 
-                using var response = await _httpSend(httpReq, request.Ct).ConfigureAwait(false);
+                using var response = await _httpSend(httpReq, linkedCts.Token).ConfigureAwait(false);
                 string body = response.Content != null
                     ? await response.Content.ReadAsStringAsync().ConfigureAwait(false)
                     : string.Empty;
@@ -99,7 +98,7 @@ namespace RimMind.ModelService.Audio
                 {
                     string safeBody = SecretRedactor.ForMessageWithSecret(body, apiKey, 512);
                     return Result<SpeechRecognitionResult, RimMindError>.Err(
-                        HttpErrorClassifier.ClassifyDefault((int)response.StatusCode, safeBody, DisplayLabel));
+                        CoreHttpErrorClassifier.Classify((int)response.StatusCode, safeBody, DisplayLabel));
                 }
 
                 return ParseSuccessResponse(body, apiKey);
@@ -107,6 +106,11 @@ namespace RimMind.ModelService.Audio
             catch (OperationCanceledException) when (request.Ct.IsCancellationRequested)
             {
                 return Result<SpeechRecognitionResult, RimMindError>.Err(RimMindErrors.Cancelled());
+            }
+            catch (OperationCanceledException)
+            {
+                return Result<SpeechRecognitionResult, RimMindError>.Err(
+                    RimMindErrors.Timeout($"DeepSeek ASR request timed out after {RequestTimeoutSeconds}s."));
             }
             catch (Exception ex)
             {

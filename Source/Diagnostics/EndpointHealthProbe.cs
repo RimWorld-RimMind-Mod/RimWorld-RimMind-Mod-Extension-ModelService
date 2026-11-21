@@ -3,6 +3,7 @@ using System.Diagnostics;
 using System.Net.Http;
 using System.Threading;
 using System.Threading.Tasks;
+using RimMind.Application.Features.Llm;
 using RimMind.ModelService.Models;
 using RimMind.ModelService.Protocol;
 using RimMind.ModelService.Security;
@@ -11,13 +12,7 @@ namespace RimMind.ModelService.Diagnostics
 {
     public static class EndpointHealthProbe
     {
-        private static readonly HttpClient HttpClient = new HttpClient(new HttpClientHandler
-        {
-            AllowAutoRedirect = false
-        })
-        {
-            Timeout = TimeSpan.FromSeconds(15)
-        };
+        private const int ProbeTimeoutSeconds = 15;
 
         public static Task<(bool success, int latencyMs, string message)> ProbeEndpointAsync(
             ModelEndpointConfig endpoint,
@@ -36,8 +31,8 @@ namespace RimMind.ModelService.Diagnostics
 
             var protocol = ModelProtocolRegistry.Resolve(endpoint);
 
-            // Security check for local subscription gateway
-            if (protocol.LegacyProviderType == ProviderType.LocalSubscriptionGateway)
+            // Capability-driven loopback security check
+            if (protocol.Capabilities.RequiresLoopback)
             {
                 if (!LocalLoopbackValidator.IsLoopbackAddress(endpoint.endpoint))
                 {
@@ -46,14 +41,17 @@ namespace RimMind.ModelService.Diagnostics
             }
 
             var sendAsync = httpSendOverride
-                ?? ((req, token) => HttpClient.SendAsync(req, HttpCompletionOption.ResponseHeadersRead, token));
+                ?? ((req, token) => RimMindHttpClientPool.NoRedirect.SendAsync(req, HttpCompletionOption.ResponseHeadersRead, token));
+
+            using var timeoutCts = new CancellationTokenSource(TimeSpan.FromSeconds(ProbeTimeoutSeconds));
+            using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(ct, timeoutCts.Token);
 
             var stopwatch = Stopwatch.StartNew();
             try
             {
                 string resolvedUrl = endpoint.endpoint.TrimEnd('/') + "/models";
                 using var request = protocol.BuildHealthProbeRequest(endpoint, resolvedUrl);
-                using var response = await sendAsync(request, ct).ConfigureAwait(false);
+                using var response = await sendAsync(request, linkedCts.Token).ConfigureAwait(false);
                 stopwatch.Stop();
                 int latency = (int)stopwatch.ElapsedMilliseconds;
 

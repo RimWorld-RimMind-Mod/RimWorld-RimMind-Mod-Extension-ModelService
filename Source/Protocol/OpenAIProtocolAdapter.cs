@@ -1,15 +1,15 @@
 using System;
+using RimMind.Application.Features.Llm;
 using RimMind.Domain.Llm;
 using RimMind.Domain.ValueObjects;
-using RimMind.Infrastructure.Services.Clients.OpenAI;
 using RimMind.ModelService.Models;
 
 namespace RimMind.ModelService.Protocol
 {
     /// <summary>
     /// OpenAI chat-completions wire adapter for ModelService endpoints.
-    /// Delegates directly to Core's <see cref="OpenAIRequestSerializer"/> so request serialization
-    /// and response parsing stay 100% shared with Core's built-in client.
+    /// Delegates directly to Core's public <see cref="OpenAIWireCodec"/> so request serialization
+    /// and response parsing stay 100% shared with Core without touching Core Infrastructure.
     /// </summary>
     public static class OpenAIProtocolAdapter
     {
@@ -22,7 +22,7 @@ namespace RimMind.ModelService.Protocol
                 ? node.modelName
                 : DefaultModelName;
 
-            return OpenAIRequestSerializer.BuildRequestJson(
+            return OpenAIWireCodec.BuildRequestJson(
                 envelope,
                 modelName,
                 defaultMaxTokens: 0,
@@ -32,9 +32,9 @@ namespace RimMind.ModelService.Protocol
         }
 
         public static Result<LlmResponse, RimMindError> ParseResponse(string responseJson)
-            => OpenAIRequestSerializer.ParseResponse(responseJson, null);
+            => OpenAIWireCodec.ParseResponse(responseJson, null);
 
         public static Result<LlmResponse, RimMindError> ParseResponse(string responseJson, LlmRequestEnvelope? envelope)
-            => OpenAIRequestSerializer.ParseResponse(responseJson, envelope);
+            => OpenAIWireCodec.ParseResponse(responseJson, envelope);
     }
 }

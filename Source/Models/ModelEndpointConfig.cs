@@ -93,6 +93,8 @@ namespace RimMind.ModelService.Models
 
         public bool IsLoopbackAddress => Security.LocalLoopbackValidator.IsLoopbackAddress(endpoint);
 
+        public const long DefaultCooldownMs = 60_000L;
+
         // Runtime diagnostics (thread-safe, not saved to XML)
         [NonSerialized]
         private int _consecutiveFailures;
@@ -104,6 +106,10 @@ namespace RimMind.ModelService.Models
         private int _lastLatencyMs = -1;
         [NonSerialized]
         private int _isHealthy = 1;
+        [NonSerialized]
+        private int _successGeneration;
+
+        internal int SuccessGeneration => Volatile.Read(ref _successGeneration);
 
         public long LastFailureTimestampMs
         {
@@ -145,9 +151,10 @@ namespace RimMind.ModelService.Models
             LastFailureTimestampMs = 0;
             lastLatencyMs = latencyMs;
             isHealthy = true;
+            Interlocked.Increment(ref _successGeneration);
         }
 
-        public void RecordFailure(long currentTick, long cooldownTicks = 60000)
+        public void RecordFailure(long currentTick, long cooldownTicks = DefaultCooldownMs)
         {
             LastFailureTimestampMs = currentTick;
             int failures = Interlocked.Increment(ref _consecutiveFailures);
@@ -158,7 +165,7 @@ namespace RimMind.ModelService.Models
             }
         }
 
-        public void IsolateImmediately(long currentTick, long cooldownTicks = 60000)
+        public void IsolateImmediately(long currentTick, long cooldownTicks = DefaultCooldownMs)
         {
             LastFailureTimestampMs = currentTick;
             int current = Volatile.Read(ref _consecutiveFailures);

@@ -1189,6 +1189,13 @@ namespace RimMind.ModelService.Tests.Contracts
             public string FallbackLabel => "Gemini Native";
             public string DefaultEndpointUrl => "https://generativelanguage.googleapis.com/v1beta";
             public string DefaultModel => "gemini-2.5-flash";
+            public ProtocolCapabilities Capabilities => ProtocolCapabilities.Default;
+
+            public Uri ResolveCompletionUri(ModelEndpointConfig endpoint)
+            {
+                string model = !string.IsNullOrEmpty(endpoint.modelName) ? endpoint.modelName : DefaultModel;
+                return new Uri(endpoint.endpoint.TrimEnd('/') + "/models/" + model + ":generateContent");
+            }
 
             public Result<string, RimMindError> BuildRequestJson(LlmRequestEnvelope envelope, string modelOverride)
             {

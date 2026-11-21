@@ -1,15 +1,16 @@
+using RimMind.ModelService.Client;
 using RimMind.ModelService.Settings;
+using RimMind.Presentation.Api;
 using RimMind.Presentation.Settings;
 using UnityEngine;
-using Verse;
 
 namespace RimMind.ModelService.Integration
 {
     public sealed class ModelServiceSettingsTab : ISettingsTab
     {
-        public string Id => "model_service";
-        public string OwnerModId => "mcocdaa.RimMindModelService";
-        public string Label => "RimMind.ModelService.Settings.Category".CanTranslate() ? (string)"RimMind.ModelService.Settings.Category".Translate() : "Model Service";
+        public string Id => ModelServiceClientFactory.ModelServiceSettingsTabId;
+        public string OwnerModId => ModelServiceClientFactory.ModelServiceOwnerModId;
+        public string Label => RimMindText.TrOr("RimMind.ModelService.Settings.Category", "Model Service");
 
         public void Draw(Rect rect)
         {

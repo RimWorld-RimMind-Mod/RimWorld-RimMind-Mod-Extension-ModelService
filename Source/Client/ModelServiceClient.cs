@@ -8,6 +8,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using RimMind.Application.Common.Interfaces.Client;
 using RimMind.Application.Common.Models.Npc;
+using RimMind.Application.Features.Llm;
 using RimMind.Domain.Common;
 using RimMind.Domain.Llm;
 using RimMind.Domain.ValueObjects;
@@ -15,6 +16,7 @@ using RimMind.ModelService.Balancing;
 using RimMind.ModelService.Models;
 using RimMind.ModelService.Protocol;
 using RimMind.ModelService.Security;
+using CoreHttpErrorClassifier = RimMind.Application.Features.Llm.HttpErrorClassifier;
 
 namespace RimMind.ModelService.Client
 {
@@ -23,17 +25,10 @@ namespace RimMind.ModelService.Client
         private const int MaxErrorBodyChars = 500;
         private const int DefaultOverallTimeoutSeconds = 180;
 
-        private static readonly HttpClient HttpClient = new HttpClient(new HttpClientHandler
-        {
-            AllowAutoRedirect = false
-        })
-        {
-            Timeout = Timeout.InfiniteTimeSpan
-        };
-
         private readonly Func<IReadOnlyList<ModelEndpointConfig>> _endpointsProvider;
         private readonly Func<BalancingStrategy> _strategyProvider;
         private readonly ILoadBalancer _loadBalancer;
+        private readonly EndpointFailoverPolicy _failoverPolicy;
         private readonly Func<HttpRequestMessage, CancellationToken, Task<HttpResponseMessage>> _httpSend;
         private readonly Func<long> _clockMs;
         private bool _disposed;
@@ -57,13 +52,17 @@ namespace RimMind.ModelService.Client
         {
             _endpointsProvider = endpointsProvider ?? throw new ArgumentNullException(nameof(endpointsProvider));
             _strategyProvider = strategyProvider ?? throw new ArgumentNullException(nameof(strategyProvider));
-            _loadBalancer = loadBalancer ?? new LoadBalancer();
-            _httpSend = httpSendOverride ?? ((req, ct) => HttpClient.SendAsync(req, ct));
             _clockMs = clockMsOverride ?? (() => DateTimeOffset.UtcNow.ToUnixTimeMilliseconds());
+            _failoverPolicy = (loadBalancer as LoadBalancer)?.FailoverPolicy
+                ?? new EndpointFailoverPolicy(
+                    clockMs: _clockMs,
+                    defaultIsolationMs: ModelEndpointConfig.DefaultCooldownMs,
+                    transientRateLimitIsolationMs: EndpointFailoverPolicy.DefaultTransientRateLimitIsolationMs,
+                    permanentIsolationMs: EndpointFailoverPolicy.DefaultPermanentIsolationMs);
+            _loadBalancer = loadBalancer ?? new LoadBalancer(_failoverPolicy);
+            _httpSend = httpSendOverride ?? ((req, ct) => RimMindHttpClientPool.NoRedirect.SendAsync(req, ct));
         }
 
-        // Redaction patterns are shared with Core's LogSanitizer via SecretRedactor (parity-tested);
-        // the node's own configured key is masked literally as well, whatever its shape.
         private static string SanitizeAndTruncate(string? text, string? knownSecret, int maxChars = MaxErrorBodyChars)
         {
             if (string.IsNullOrEmpty(text)) return string.Empty;
@@ -170,7 +169,7 @@ namespace RimMind.ModelService.Client
                 triedEndpoints.Add(node.id);
 
                 var protocol = ModelProtocolRegistry.Resolve(node);
-                if (protocol.LegacyProviderType == ProviderType.LocalSubscriptionGateway && !node.IsLoopbackAddress)
+                if (protocol.Capabilities.RequiresLoopback && !node.IsLoopbackAddress)
                 {
                     long failTick = _clockMs();
                     node.RecordFailure(failTick);
@@ -180,7 +179,7 @@ namespace RimMind.ModelService.Client
                     continue;
                 }
 
-                var result = await TrySendToNodeAsync(envelope, node, protocol, overallToken, callerToken).ConfigureAwait(false);
+                var (result, isRateLimited) = await TrySendToNodeAsync(envelope, node, protocol, overallToken, callerToken).ConfigureAwait(false);
                 if (result.IsOk)
                 {
                     return result;
@@ -200,10 +199,14 @@ namespace RimMind.ModelService.Client
                     return result;
                 }
 
+                string nodeKey = LoadBalancer.BuildNodeKey(node);
+
                 // Billing / invalid-key failures isolate THIS node immediately and try backup nodes.
                 if (result.Error.Code == RimMindErrorCode.ClientQuotaOrAuthFailure)
                 {
-                    node.IsolateImmediately(_clockMs());
+                    long failTick = _clockMs();
+                    node.IsolateImmediately(failTick);
+                    RecordFailoverFailure(node, nodeKey, result.Error, isRateLimited: false, nowMs: failTick);
                     lastQuotaOrAuthError = result.Error;
                     lastErrorMessage = result.Error.Message;
                     continue;
@@ -216,6 +219,10 @@ namespace RimMind.ModelService.Client
 
                 long failureTimestampMs = _clockMs();
                 node.RecordFailure(failureTimestampMs);
+                if (isRateLimited || node.consecutiveFailures >= 3)
+                {
+                    RecordFailoverFailure(node, nodeKey, result.Error, isRateLimited: isRateLimited, nowMs: failureTimestampMs);
+                }
                 lastError = result.Error;
                 lastErrorMessage = result.Error.Message;
             }
@@ -245,7 +252,21 @@ namespace RimMind.ModelService.Client
                 RimMindErrors.ClientTransient($"All candidate endpoints failed. Last error: {lastErrorMessage}"));
         }
 
-        private async Task<Result<LlmResponse, RimMindError>> TrySendToNodeAsync(
+        private void RecordFailoverFailure(
+            ModelEndpointConfig node,
+            string nodeKey,
+            RimMindError error,
+            bool isRateLimited,
+            long nowMs)
+        {
+            if (_loadBalancer is LoadBalancer lb)
+            {
+                lb.ObserveNodeRecoveryBaseline(node);
+            }
+            _failoverPolicy.RecordFailure(nodeKey, error, isRateLimited: isRateLimited, nowMs: nowMs);
+        }
+
+        private async Task<(Result<LlmResponse, RimMindError> Result, bool IsRateLimited)> TrySendToNodeAsync(
             LlmRequestEnvelope envelope,
             ModelEndpointConfig node,
             IModelProtocol protocol,
@@ -265,11 +286,11 @@ namespace RimMind.ModelService.Client
                     : protocol.BuildRequestJson(envelope, modelOverride);
                 if (payloadResult.IsErr)
                 {
-                    return Result<LlmResponse, RimMindError>.Err(payloadResult.Error);
+                    return (Result<LlmResponse, RimMindError>.Err(payloadResult.Error), false);
                 }
 
-                string defaultRequestUrl = node.endpoint.TrimEnd('/') + "/chat/completions";
-                using var request = new HttpRequestMessage(HttpMethod.Post, defaultRequestUrl);
+                Uri completionUri = protocol.ResolveCompletionUri(node);
+                using var request = new HttpRequestMessage(HttpMethod.Post, completionUri);
                 string? sessionKey = !string.IsNullOrEmpty(envelope.NpcId) ? envelope.NpcId : envelope.RequestId;
                 protocol.ApplyHeaders(request, node, sessionKey);
 
@@ -286,14 +307,21 @@ namespace RimMind.ModelService.Client
                     string safeBody = SanitizeAndTruncate(responseBody, node.apiKey);
                     RimMindError classifiedError = contextual != null
                         ? contextual.ClassifyHttpError(statusCode, safeBody, node)
-                        : HttpErrorClassifier.ClassifyDefault(statusCode, safeBody, node.name);
-                    return Result<LlmResponse, RimMindError>.Err(classifiedError);
+                        : CoreHttpErrorClassifier.Classify(statusCode, safeBody, node.name);
+                    bool isRateLimited = CoreHttpErrorClassifier.IsTransientRateLimitOrQueueError(statusCode, safeBody);
+                    return (Result<LlmResponse, RimMindError>.Err(classifiedError), isRateLimited);
                 }
 
                 var parseResult = protocol.ParseResponse(responseBody, envelope);
                 if (parseResult.IsOk)
                 {
                     node.RecordSuccess((int)stopwatch.ElapsedMilliseconds);
+                    _failoverPolicy.RecordSuccess(LoadBalancer.BuildNodeKey(node));
+                    if (_loadBalancer is LoadBalancer lb)
+                    {
+                        lb.ObserveNodeRecoveryBaseline(node);
+                    }
+
                     var val = parseResult.Value;
                     // Like Core's OpenAIClient, responses are correlated by the envelope's RequestId;
                     // the provider's own completion id is only a fallback for id-less envelopes.
@@ -302,23 +330,23 @@ namespace RimMind.ModelService.Client
                     parseResult = Result<LlmResponse, RimMindError>.Ok(val);
                 }
 
-                return parseResult;
+                return (parseResult, false);
             }
             catch (OperationCanceledException)
             {
                 stopwatch.Stop();
                 if (callerToken.IsCancellationRequested)
                 {
-                    return Result<LlmResponse, RimMindError>.Err(RimMindErrors.Cancelled());
+                    return (Result<LlmResponse, RimMindError>.Err(RimMindErrors.Cancelled()), false);
                 }
-                return Result<LlmResponse, RimMindError>.Err(
-                    RimMindErrors.Timeout($"Node '{node.name}' timed out after {attemptTimeoutSec}s."));
+                return (Result<LlmResponse, RimMindError>.Err(
+                    RimMindErrors.Timeout($"Node '{node.name}' timed out after {attemptTimeoutSec}s.")), false);
             }
             catch (Exception ex)
             {
                 stopwatch.Stop();
-                return Result<LlmResponse, RimMindError>.Err(
-                    RimMindErrors.ClientTransient($"Failed to reach node '{node.name}': {SanitizeAndTruncate(ex.Message, node.apiKey)}", ex));
+                return (Result<LlmResponse, RimMindError>.Err(
+                    RimMindErrors.ClientTransient($"Failed to reach node '{node.name}': {SanitizeAndTruncate(ex.Message, node.apiKey)}", ex)), false);
             }
         }
 
@@ -337,7 +365,42 @@ namespace RimMind.ModelService.Client
                 : null;
             CancellationToken effectiveCt = callerCts?.Token ?? (ct.CanBeCanceled ? ct : envelope.Ct);
 
-            return await SendCoreAsync(envelope, effectiveCt).ConfigureAwait(false);
+            var result = await SendCoreAsync(envelope, effectiveCt).ConfigureAwait(false);
+            if (result.IsOk && onChunk != null)
+            {
+                var response = result.Value;
+                if (!string.IsNullOrEmpty(response.ReasoningContent))
+                {
+                    onChunk(new LlmChunk { DeltaReasoningContent = response.ReasoningContent });
+                }
+
+                if (!string.IsNullOrEmpty(response.Content) || !string.IsNullOrEmpty(response.ToolCallsJson))
+                {
+                    onChunk(new LlmChunk
+                    {
+                        DeltaContent = string.IsNullOrEmpty(response.Content) ? null : response.Content,
+                        DeltaToolCallsJson = response.ToolCallsJson
+                    });
+                }
+
+                if (response.PromptTokens > 0 || response.CompletionTokens > 0 || response.CachedTokens > 0)
+                {
+                    onChunk(new LlmChunk
+                    {
+                        DeltaPromptTokens = response.PromptTokens,
+                        DeltaCompletionTokens = response.CompletionTokens,
+                        DeltaCachedTokens = response.CachedTokens
+                    });
+                }
+
+                onChunk(new LlmChunk
+                {
+                    IsLast = true,
+                    FinalResponse = response
+                });
+            }
+
+            return result;
         }
 
         public Task<Result<bool, RimMindError>> SpawnNpcAsync(NpcProfile profile) =>
