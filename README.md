@@ -8,7 +8,7 @@
 <p>
   <a href="https://rimworldgame.com/"><img src="https://img.shields.io/badge/RimWorld-1.6%20%7C%201.7-brightgreen.svg" alt="RimWorld 1.6 | 1.7"></a>
   <a href="https://github.com/RimWorld-RimMind-Mod/RimWorld-RimMind-Mod-Core"><img src="https://img.shields.io/badge/Dependency-RimMind--Core-blue.svg" alt="Dependency: RimMind-Core"></a>
-  <a href="#"><img src="https://img.shields.io/badge/Unit%20Tests-17%2B%20Passing-success.svg" alt="Unit Tests"></a>
+  <a href="#"><img src="https://img.shields.io/badge/Unit%20Tests-38%20Passing-success.svg" alt="Unit Tests"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-yellow.svg" alt="License: MIT"></a>
 </p>
 
@@ -23,12 +23,12 @@
 **RimMind-Extension-ModelService** extends `RimMind-Core` with advanced cloud subscription gateways, local loopback proxy security, cutting-edge caching protocols, and zero-downtime failover load balancing.
 
 ### Key Highlights
-- **DeepSeek Native Dialect & V4 Adaptation (`deepseek`)**: Implements `IContextualModelProtocol` (`DeepSeekProtocolAdapter` & `DeepSeekClientFactory`), translating Core `ReasoningEffort` into `thinking` + `reasoning_effort`, injecting `safety_check` + sanitized `user_id`, resolving parameter conflicts (`tool_choice`, `temperature`, `json_object`), preserving multi-turn tool `reasoning_content`, and mapping `402` billing failover + `400 Content Exists Risk` moderation without circuit breakage.
-- **DeepSeek Voice Services (`ISpeechSynthesizer` / `ISpeechRecognizer`)**: Registers orthogonal `/v1/tools/tts` (`DeepSeekSpeechSynthesizer`) and `/v1/tools/asr` (`DeepSeekSpeechRecognizer`) adapters into `RimMindAPI.Ext`.
+- **DeepSeek Native Dialect & V4 Adaptation (`deepseek`)**: Implements unified `IModelProtocol` (`DeepSeekProtocolAdapter` & `DeepSeekClientFactory`), translating Core `ReasoningEffort` into `thinking` + `reasoning_effort`, injecting `safety_check` + sanitized `user_id`, resolving parameter conflicts (`tool_choice`, `temperature`, `json_object`), preserving multi-turn tool `reasoning_content`, and mapping `402` billing failover + `400 Content Exists Risk` moderation without circuit breakage.
+- **DeepSeek Voice Services (`ISpeechSynthesizer` / `ISpeechRecognizer`)**: Registers orthogonal `/v1/tools/tts` (`DeepSeekSpeechSynthesizer`) and `/v1/tools/asr` (`DeepSeekSpeechRecognizer`) adapters into `RimMindAPI.Ext` over `RimMindHttpClientPool.NoRedirect`.
 - **OpenCode Go Subscription Direct Access**: One-click subscription preset (`https://opencode.ai/zen/go/v1`) via `OpenCodeGoClientFactory` with automatic session isolation headers (`x-opencode-session`).
 - **Anthropic Protocol Adapter**: Implements native Anthropic `messages` protocol with `cache_control: {"type": "ephemeral"}` markings on static L0/L1 prefix layers, maximizing hardware-level KV cache reuse.
 - **Local Subscription Loopback Security**: Strictly enforces loopback binding (`127.0.0.1`, `localhost`, `::1`) via `LocalLoopbackValidator` for local subscription gateways (Codex, Sub2API, NewAPI), preventing accidental credential leakage over public networks.
-- **Multi-Endpoint Load Balancing & Failover**: Supports `PriorityFailover` and `RoundRobin` routing with 60-second circuit isolation (`LoadBalancer`), millisecond HTTP latency probing (`EndpointHealthProbe`), and F8 Debug Hub diagnostics (`ModelServiceF8Diagnostics`).
+- **Multi-Endpoint Load Balancing & Failover**: Supports `PriorityFailover` and `RoundRobin` routing with circuit isolation (`LoadBalancer`), millisecond HTTP latency probing (`EndpointHealthProbe`), and DevMode `ModelServiceDebugActions` diagnostics.
 
 ---
 
@@ -44,13 +44,15 @@
 ```mermaid
 flowchart TD
     Core["RimMind-Core Request Dispatcher"] --> Factory["IAIClientFactory Registry"]
+    Factory --> DeepSeekFactory["DeepSeekClientFactory (deepseek_native)"]
     Factory --> OpenCode["OpenCodeGoClientFactory (x-opencode-session)"]
     Factory --> Extended["ModelServiceClientFactory (enableService Gated)"]
     Extended --> Balancer["LoadBalancer (PriorityFailover / RoundRobin)"]
     Balancer --> OpenAI["OpenAIProtocolAdapter"]
+    Balancer --> DeepSeek["DeepSeekProtocolAdapter (Thinking / Safety)"]
     Balancer --> Anthropic["AnthropicProtocolAdapter (Ephemeral KV Cache)"]
     Balancer --> Loopback["LocalLoopbackValidator (127.0.0.1 / ::1 Guard)"]
-    Balancer --> Health["EndpointHealthProbe & F8 Diagnostics"]
+    Balancer --> Health["EndpointHealthProbe & DebugActions"]
 ```
 
 ---
@@ -68,7 +70,7 @@ flowchart TD
 
 ## ⚙️ Settings Reference
 
-Configurable via **Options -> Mod Settings -> RimMind - Extended Model Service**:
+Configurable via **Options -> Mod Settings -> RimMind - Model Service** (or the **Model Service** tab in RimMind settings):
 
 | Setting | Default | Description |
 |---|---|---|

@@ -1,10 +1,8 @@
 using System;
-using System.Collections.Generic;
 using RimMind.Application.Common.Interfaces.Client;
 using RimMind.Application.Common.Interfaces.Internal;
 using RimMind.ModelService.Models;
 using RimMind.ModelService.Protocol;
-using RimMind.ModelService.Security;
 
 namespace RimMind.ModelService.Client
 {
@@ -39,8 +37,8 @@ namespace RimMind.ModelService.Client
 
             string coreApiKey = settings?.ApiKey ?? string.Empty;
             string? coreEndpoint = settings?.ApiEndpoint;
-            string endpointUrl = !string.IsNullOrWhiteSpace(coreEndpoint) && IsDeepSeekOrLoopbackEndpoint(coreEndpoint!)
-                ? coreEndpoint!
+            string endpointUrl = IsValidHttpEndpoint(coreEndpoint)
+                ? coreEndpoint!.Trim()
                 : protocol.DefaultEndpointUrl;
             string model = !string.IsNullOrWhiteSpace(settings?.ModelName)
                 ? settings!.ModelName
@@ -53,7 +51,6 @@ namespace RimMind.ModelService.Client
                 endpoint = endpointUrl,
                 modelName = model,
                 apiKey = coreApiKey,
-                providerType = ProviderType.DeepSeekOfficial,
                 protocolId = ModelProtocolRegistry.DeepSeekProtocolId,
                 thinkingPolicy = EndpointThinkingPolicy.FollowRequest,
                 safetyLevel = EndpointSafetyLevel.High,
@@ -65,37 +62,28 @@ namespace RimMind.ModelService.Client
             return new ModelServiceClient(
                 () =>
                 {
-                    if (msSettings != null && msSettings.enableService && msSettings.endpoints != null)
-                    {
-                        IReadOnlyList<ModelEndpointConfig> source = envOverlay == null
-                            ? (IReadOnlyList<ModelEndpointConfig>)msSettings.endpoints
-                            : envOverlay.Apply(msSettings.endpoints);
+                    var deepSeekNodes = EndpointPoolResolver.GetEndpoints(
+                        msSettings,
+                        envOverlay,
+                        protocolIdFilter: ModelProtocolRegistry.DeepSeekProtocolId,
+                        requireEnableService: true,
+                        enabledOnly: true);
 
-                        var deepSeekNodes = new List<ModelEndpointConfig>();
-                        for (int i = 0; i < source.Count; i++)
-                        {
-                            var ep = source[i];
-                            if (ep != null &&
-                                ep.isEnabled &&
-                                string.Equals(ep.EffectiveProtocolId, ModelProtocolRegistry.DeepSeekProtocolId, StringComparison.OrdinalIgnoreCase))
-                            {
-                                deepSeekNodes.Add(ep);
-                            }
-                        }
-
-                        if (deepSeekNodes.Count > 0)
-                            return deepSeekNodes;
-                    }
+                    if (deepSeekNodes.Count > 0)
+                        return deepSeekNodes;
 
                     return new[] { directNode };
                 },
                 () => msSettings?.balancingStrategy ?? BalancingStrategy.PriorityFailover);
         }
 
-        private static bool IsDeepSeekOrLoopbackEndpoint(string endpoint)
+        private static bool IsValidHttpEndpoint(string? endpoint)
         {
-            return endpoint.IndexOf("deepseek", StringComparison.OrdinalIgnoreCase) >= 0 ||
-                   LocalLoopbackValidator.IsLoopbackAddress(endpoint);
+            if (string.IsNullOrWhiteSpace(endpoint))
+                return false;
+
+            return Uri.TryCreate(endpoint!.Trim(), UriKind.Absolute, out var uri)
+                && (uri.Scheme == Uri.UriSchemeHttp || uri.Scheme == Uri.UriSchemeHttps);
         }
     }
 }

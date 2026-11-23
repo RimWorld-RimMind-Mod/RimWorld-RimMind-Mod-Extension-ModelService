@@ -239,6 +239,34 @@ namespace RimMind.ModelService.Tests.Contracts
                     Assert.Equal("tool_use", messages[3]["content"]?[0]?["type"]?.ToString());
                     Assert.Equal("call_1", messages[4]["content"]?[0]?["tool_use_id"]?.ToString());
                 }),
+                ("multi-turn assistant tool_use history sanitizes dotted tool names to match declared tools", () =>
+                {
+                    var envelope = new LlmRequestEnvelope
+                    {
+                        Messages = new List<ChatMessage>
+                        {
+                            new ChatMessage { Role = "user", Content = "Move" },
+                            new ChatMessage
+                            {
+                                Role = "assistant",
+                                Content = "",
+                                ToolCalls = new List<ChatToolCall>
+                                {
+                                    new ChatToolCall { Id = "call_dot", Name = "actions.move_pawn", Arguments = "{\"x\":1}" }
+                                }
+                            },
+                            new ChatMessage { Role = "tool", ToolCallId = "call_dot", Content = "moved" }
+                        },
+                        Tools = new List<StructuredTool>
+                        {
+                            new StructuredTool { Name = "actions.move_pawn", Description = "Move" }
+                        }
+                    };
+
+                    var parsed = JObject.Parse(AnthropicProtocolAdapter.BuildRequestJson(envelope, Node()));
+                    var messages = (JArray)parsed["messages"]!;
+                    Assert.Equal("actions_move_pawn", messages[1]["content"]?[0]?["name"]?.ToString());
+                }),
                 ("no tool_choice is sent unless a tool requires it, and empty tool calls parse to null", () =>
                 {
                     var envelope = new LlmRequestEnvelope

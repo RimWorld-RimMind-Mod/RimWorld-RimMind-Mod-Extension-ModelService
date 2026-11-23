@@ -5,12 +5,12 @@ RimMind 的独立模型服务扩展模组，提供第三方模型协议适配、
 ## 项目定位
 
 Core 本身内置了标准 OpenAI 协议客户端。本扩展模组作为可插拔的扩展层，为 RimMind 运行体系扩展了：
-- **DeepSeek 官方原生协议与语音适配（`deepseek` / `deepseek_native`）**：实现 `IContextualModelProtocol`，支持退休模型自动归一化（`deepseek-chat`/`deepseek-reasoner` -> `deepseek-flash`）、`ReasoningEffort` -> `thinking` / `reasoning_effort`、`safety_check.level=high` 与 `user_id` 隔离、冲突参数自动消解、多轮工具历史 `reasoning_content` 保留，并通过 `RimMindAPI.Ext` 注册 `ISpeechSynthesizer`（`/v1/tools/tts`）与 `ISpeechRecognizer`（`/v1/tools/asr`）。
-- **原生 Anthropic Claude 协议适配**：支持顶层 `system` 隔离、`tool_use` / `tool_result` 块互转、`refusal` 内容拒绝分类与 `cache_read_input_tokens` 提取。
+- **DeepSeek 官方原生协议与语音适配（`deepseek` / `deepseek_native`）**：实现统一 `IModelProtocol`，支持退休模型自动归一化（`deepseek-chat`/`deepseek-reasoner` -> `deepseek-flash`）、`ReasoningEffort` -> `thinking` / `reasoning_effort`、`safety_check.level=high` 与 `user_id` 隔离、冲突参数自动消解、多轮工具历史 `reasoning_content` 保留，并通过 `RimMindAPI.Ext` 注册 `ISpeechSynthesizer`（`/v1/tools/tts`）与 `ISpeechRecognizer`（`/v1/tools/asr`）。
+- **原生 Anthropic Claude 协议适配**：支持顶层 `system` 隔离、`tool_use`（含点号工具名 `.` -> `_` 归一化）/ `tool_result` 块互转、`refusal` 内容拒绝分类、固定附带 `anthropic-version` 请求头与 `cache_read_input_tokens` 提取。
 - **本地订阅安全网关（Codex / Sub2API / NewAPI）**：安全强制绑定本机回环地址（`127.0.0.1` / `localhost` / `::1`），杜绝公网泄露本地订阅凭据风险。
-- **多端点负载均衡与高可用容灾**：支持按节点权重（`Math.Max(1, weight)`）分配的加权轮询（Weighted Round Robin）与主备故障转移（Priority Failover）；支持单节点独立超时（`node.timeoutSeconds`）与基于失败发生时刻（failure-time clock）的 60 秒自动熔断隔离及半开恢复探测；通过 `HttpErrorClassifier` 精准区分 `ContentFiltered`（不重试、不触发断路器）、`ClientPermanentFailure`（不重试）与 `ClientQuotaOrAuthFailure`（`IsolateImmediately` 立即熔断当前节点并故障转移至备用节点）。
-- **实时网络延迟与健康探针**：异步测量端点 RTT 延迟与连通状态，区分 HTTP 401/403 未授权响应（记录延迟但标记 `isHealthy = false` 且不重置失败计数），并支持在游戏内设置界面与 DebugAction 一键 Ping 诊断。
-- **非持久化环境变量凭据覆盖（`EnvironmentEndpointOverlay`）**：将 `RIMMIND_TEST_*` / `RIMMIND_BACKUP_*` 自动化测试凭据以内存级 shadow 副本方式覆盖到无 Key 的 `OpenCodeGo` 节点，绝不污染或落盘修改玩家持久化设置。
+- **多端点负载均衡与高可用容灾**：支持按节点权重（`Math.Max(1, weight)`）分配的加权轮询（Weighted Round Robin）与主备故障转移（Priority Failover）；支持单节点独立超时（`node.timeoutSeconds`）、SHA-256 指纹节点键（不暴露原始 API Key 子串）、基于失败发生时刻（failure-time clock）的自动熔断隔离及半开恢复探测；通过协议 `ClassifyHttpError`（委托 Core `HttpErrorClassifier`）精准区分 `ContentFiltered`（不重试、不触发断路器）、`ClientPermanentFailure`（不重试）与 `ClientQuotaOrAuthFailure`（`IsolateImmediately` 立即熔断当前节点并故障转移至备用节点）。
+- **实时网络延迟与健康探针**：通过协议自身 `BuildHealthProbeRequest(endpoint)` 异步测量端点 RTT 延迟与连通状态，区分 HTTP 401/403 未授权响应（记录延迟但标记 `isHealthy = false` 且不重置失败计数），并支持在游戏内设置界面与 DebugAction 对已启用节点一键 Ping 诊断。
+- **非持久化环境变量凭据覆盖（`EnvironmentEndpointOverlay`）**：动态扫描 `ModelProtocolRegistry.All` 中声明了 `EnvOverrideBinding` 的协议（含 `OpenCodeGo`、`DeepSeek` 及第三方扩展协议），将自动化测试凭据以内存级 shadow 副本方式覆盖到无 Key 节点，绝不污染或落盘修改玩家持久化设置。
 
 依赖 Core，通过 Core 的 `IAIClientFactory` 扩展接口向 `RimMindAPI.Request` 注册 `deepseek_native`、`opencode` 与 `extended_service` 提供商，并通过 `RimMindAPI.Ext` 注册 `ISpeechSynthesizer` 与 `ISpeechRecognizer`。
 
@@ -18,10 +18,11 @@ Core 本身内置了标准 OpenAI 协议客户端。本扩展模组作为可插�
 
 | 项 | 值 |
 |----|-----|
-| Target | net48 (源码), net10.0 (单元测试), C# 9.0, Nullable enable |
-| Output | `../1.6/Assemblies/` |
+| Version | 2.0.0 |
+| Target | net48 (1.6) / net10.0 (1.7), net10.0 (单元测试), C# 9.0, Nullable enable |
+| Output | `../$(GameVersion)/Assemblies/` |
 | Assembly | RimMindModelService, RootNS: RimMind.ModelService |
-| 依赖 | Krafs.Rimworld.Ref, Lib.Harmony.Ref, Newtonsoft.Json, RimMindCore (Domain/Application/Core) |
+| 依赖 | Krafs.Rimworld.Ref, Lib.Harmony.Ref, Newtonsoft.Json, `0_RimMindDomain.dll` / `1_RimMindApplication.dll` / `2_RimMindCore.dll` (`<Private>false</Private>`) |
 
 ```powershell
 # 编译模组
@@ -37,33 +38,33 @@ dotnet test RimMind-Extension-ModelService/Tests/RimMindModelService.Tests.cspro
 Source/
 ├── RimMindModelServiceMod.cs              Mod 入口，注册 deepseek_native / opencode / extended_service 工厂、TTS/ASR 扩展及设置页签
 ├── Audio/
-│   ├── DeepSeekAudioEndpointResolver.cs  解析生效 DeepSeek 节点/环境变量基址与凭据
-│   ├── DeepSeekSpeechRecognizer.cs       ISpeechRecognizer 实现（POST /v1/tools/asr multipart/form-data，共享 RimMindHttpClientPool.Shared）
-│   └── DeepSeekSpeechSynthesizer.cs      ISpeechSynthesizer 实现（POST /v1/tools/tts 文本清洗与计费守卫，共享 RimMindHttpClientPool.Shared）
+│   ├── DeepSeekAudioEndpointResolver.cs  通过 EndpointPoolResolver 与协议 EnvOverrideBinding 线程安全解析 DeepSeek 语音基址与凭据
+│   ├── DeepSeekSpeechRecognizer.cs       ISpeechRecognizer 实现（POST /v1/tools/asr multipart/form-data，共享 RimMindHttpClientPool.NoRedirect）
+│   └── DeepSeekSpeechSynthesizer.cs      ISpeechSynthesizer 实现（POST /v1/tools/tts 文本清洗与计费守卫，共享 RimMindHttpClientPool.NoRedirect）
 ├── Balancing/
-│   └── LoadBalancer.cs                   多端点调度（Priority Failover / 加权 Round Robin），集成 Core EndpointFailoverPolicy 熔断与恢复
+│   └── LoadBalancer.cs                   多端点调度（Priority Failover / 加权 Round Robin），SHA-256 节点指纹键，集成 Core EndpointFailoverPolicy 熔断与恢复
 ├── Client/
-│   ├── DeepSeekClientFactory.cs          deepseek_native 官方直连工厂（透传 ModelService DeepSeek 池或回落 Core 设置）
-│   ├── EnvironmentEndpointOverlay.cs     自动化环境变量非持久化 shadow 凭据覆盖层（数据驱动按 protocolId 匹配，不污染 ModSettings）
-│   ├── ModelServiceClient.cs             IAIClient 多端点客户端（共享 RimMindHttpClientPool.NoRedirect、能力驱动回环/URI 解析、Core HttpErrorClassifier + EndpointFailoverPolicy、SendStreamAsync 分块回传）
-│   ├── ModelServiceClientFactory.cs      extended_service 提供商工厂（受 enableService 门控 + EnvironmentEndpointOverlay）
+│   ├── DeepSeekClientFactory.cs          deepseek_native 官方直连工厂（通过 EndpointPoolResolver 透传 DeepSeek 池或回落 Core 设置，支持任意有效 HTTP/HTTPS 网关）
+│   ├── EndpointPoolResolver.cs           线程安全端点池快照与按 protocolId/健康状态筛选的统一服务
+│   ├── EnvironmentEndpointOverlay.cs     自动化环境变量非持久化 shadow 凭据覆盖层（动态读取协议 EnvOverrideBinding，不污染 ModSettings）
+│   ├── ModelServiceClient.cs             IAIClient 多端点客户端（RimMindHttpClientPool.NoRedirect、动态 IsLocalEndpoint、统一 IModelProtocol、Core HttpErrorClassifier + EndpointFailoverPolicy、SendStreamAsync 分块回传）
+│   ├── ModelServiceClientFactory.cs      extended_service 提供商工厂（经由 EndpointPoolResolver 受 enableService 门控 + EnvironmentEndpointOverlay）
 │   └── OpenCodeGoClientFactory.cs        opencode 订阅直连提供商工厂（自动注入 x-opencode-session）
 ├── Debug/
-│   └── ModelServiceDebugActions.cs       DebugAction 批量端点探活诊断（GetEndpointsSnapshot + MainThread.Post + RimMindText.TrOr）
+│   └── ModelServiceDebugActions.cs       DebugAction 批量已启用端点探活诊断（GetEndpointsSnapshot + MainThread.Post + RimMindText.TrOr）
 ├── Diagnostics/
-│   └── EndpointHealthProbe.cs            异步 HTTP 连通与 RTT 延迟探针（共享 RimMindHttpClientPool.NoRedirect + 15s 超时、能力驱动回环校验）
+│   └── EndpointHealthProbe.cs            异步 HTTP 连通与 RTT 延迟探针（共享 RimMindHttpClientPool.NoRedirect + 15s 超时、能力驱动回环校验 + 协议自构建探针请求）
 ├── Integration/
 │   └── ModelServiceSettingsTab.cs        ISettingsTab 扩展设置页签注册
 ├── Models/
-│   ├── ModelEndpointConfig.cs            端点配置模型（含 thinkingPolicy / safetyLevel / SuccessGeneration）、Scribe 持久化与 IsolateImmediately
-│   ├── ModelEndpointPresets.cs           Codex 本地网关、OpenCode Go 与 DeepSeek 官方预设工厂
-│   └── ProviderType.cs                   协议类型、负载均衡策略、思考模式与安全等级枚举
+│   ├── ModelEndpointConfig.cs            端点配置模型（protocolId 为主字段 + ExposeData 单向旧档迁移 + thinkingPolicy / safetyLevel / SuccessGeneration + IsolateImmediately）
+│   ├── ModelEndpointPresets.cs           委托各协议 PresetDescriptor 的预设工厂
+│   └── ProviderType.cs                   兼容协议类型、负载均衡策略、思考模式与安全等级枚举
 ├── Protocol/
-│   ├── AnthropicProtocolAdapter.cs       Anthropic Claude 原生 messages 协议（复用 Core PromptZonePartitioner 分区、refusal 与 ephemeral 缓存）
+│   ├── AnthropicProtocolAdapter.cs       Anthropic Claude 原生 messages 协议（复用 Core PromptZonePartitioner 分区、多轮 tool_use 点号转义、refusal 与 ephemeral 缓存）
 │   ├── DeepSeekProtocolAdapter.cs        DeepSeek V4 原生方言适配器（通过 Core OpenAIWireCodec 单次 customizePayload 钩子与 EnsureJsonKeyword 实现）
-│   ├── HttpErrorClassifier.cs            Core HttpErrorClassifier 的轻量兼容转发层（候选清理文件）
-│   ├── IModelProtocol.cs                 IModelProtocol（含 Capabilities / ResolveCompletionUri）、ProtocolCapabilities 与 IContextualModelProtocol 契约
-│   ├── ModelProtocolRegistry.cs          纯泛型协议注册表与旧版 ProviderType 别名映射
+│   ├── IModelProtocol.cs                 统一 IModelProtocol（含 Capabilities / PresetDescriptor / EnvOverrideBinding / ResolveCompletionUri / ResolveHealthProbeUri / BuildRequestJson / ClassifyHttpError / BuildHealthProbeRequest）
+│   ├── ModelProtocolRegistry.cs          线程安全协议注册表（按协议元数据动态索引 LegacyAliases 与旧版 ProviderType）
 │   ├── OpenAIProtocolAdapter.cs          OpenAI 兼容报文适配器（直接委托 Core 公共 OpenAIWireCodec）
 │   └── Protocols/                        独立具体协议实现（OpenAI / LocalGateway / OpenCodeGo / Anthropic / DeepSeek）
 ├── Security/
@@ -71,14 +72,14 @@ Source/
 │   └── SecretRedactor.cs                 凭证脱敏封装（直接委托 Core 公共 LogSecretRedactor）
 └── Settings/
     ├── ModelServiceSettings.cs           Scribe 存档配置、EndpointSyncRoot 锁对象与 GetEndpointsSnapshot 快照
-    └── ModelServiceSettingsDrawer.cs     Mod 设置界面（SettingsUIDrawer.DrawScrollableSettingsPage 脏写门控 + DrawSecretField + 能力驱动控件 + RimMindText.TrOr）
+    └── ModelServiceSettingsDrawer.cs     Mod 设置界面（SettingsUIDrawer + 动态 PresetDescriptor 工具栏按钮 + 能力驱动控件 + 仅探活已启用节点 + RimMindText.TrOr）
 ```
 
 ## 关键安全与并发契约
 
 - **回环限制契约**：类型为 `LocalSubscriptionGateway` 的端点，其主机名必须被 `LocalLoopbackValidator.IsLoopbackAddress` 认定为回环地址（`127.0.0.1` / `localhost` / `::1`）。任何指向非回环公网地址的本地订阅请求将被强制记录失败并阻断（若有健康备用节点则故障转移，否则返回 `RimMindErrors.ClientPermanent`），保护玩家的本地代理凭据。
-- **环境变量非持久化覆盖契约（`EnvironmentEndpointOverlay`）**：自动化测试环境变量（`RIMMIND_TEST_*` / `RIMMIND_BACKUP_*`）仅通过 `EnvironmentEndpointOverlay.Apply` 生成按节点 ID 缓存的内存 shadow 副本，严禁直接修改 `ModelServiceSettings.endpoints` 中的持久化实例，杜绝测试 API Key 明文写入设置 XML 或覆盖玩家 URL/模型。
-- **并发、锁与列表实例契约**：`ModelServiceClientFactory` 尊重 `ModelServiceSettings.enableService` 主开关；`ModelServiceSettings.EndpointSyncRoot` 与 `endpoints` 指向同一列表实例，`EnsureDefaultEndpoints()` 与 `ResetToDefault()` 必须在 `lock (EndpointSyncRoot)` 下原地修改集合（`Clear()` + `AddRange(...)`），保留 `endpoints` 列表引用不变。UI 渲染、批量探活与后台线程读取统一通过 `settings.GetEndpointsSnapshot()` 或 `lock (settings.EndpointSyncRoot)` 获取快照。
+- **环境变量非持久化覆盖契约（`EnvironmentEndpointOverlay`）**：自动化测试环境变量由各协议的 `EnvOverrideBinding` 动态声明，仅通过 `EnvironmentEndpointOverlay.Apply` 生成按节点 ID 缓存的内存 shadow 副本，严禁直接修改 `ModelServiceSettings.endpoints` 中的持久化实例，杜绝测试 API Key 明文写入设置 XML 或覆盖玩家 URL/模型。
+- **并发、锁与列表实例契约**：`ModelServiceClientFactory` 与 `DeepSeekClientFactory` 均通过 `EndpointPoolResolver` 尊重 `ModelServiceSettings.enableService` 主开关并线程安全快照节点；`ModelServiceSettings.EndpointSyncRoot` 与 `endpoints` 指向同一列表实例，`EnsureDefaultEndpoints()` 与 `ResetToDefault()` 必须在 `lock (EndpointSyncRoot)` 下原地修改集合（`Clear()` + `AddRange(...)`），保留 `endpoints` 列表引用不变。UI 渲染、批量探活与后台线程读取（含 `DeepSeekAudioEndpointResolver`）统一通过 `settings.GetEndpointsSnapshot()` 或 `lock (settings.EndpointSyncRoot)` 获取快照。
 - **负载均衡、单节点超时与错误分流契约**：`LoadBalancer` 支持主备优先（`PriorityFailover`）与按 `Math.Max(1, weight)` 比例分配的加权轮询（`RoundRobin`）。`ModelServiceClient` 为每个候选节点应用独立的 `node.timeoutSeconds` 超时（最小 5 秒）并叠加总超时；瞬态失败（408/429/5xx/网络异常/`insufficient_system_resource`）按失败发生时刻累加 `RecordFailure` 并触发 60 秒熔断及备切；`ClientQuotaOrAuthFailure`（HTTP 401/402/403/余额不足/Key 失效）调用 `IsolateImmediately` 立即熔断当前节点并故障转移至备用节点；`ContentFiltered`（HTTP 400 `Content Exists Risk`/`content_filter` 或 `finish_reason=content_filter`/`refusal`）与 `ClientPermanentFailure` 立即返回且不污染节点健康状态；错误消息中的 Bearer/API Key 经正则脱敏。
 - **健康探针鉴权契约（`EndpointHealthProbe`）**：探针收到 HTTP 401/403 时记录实测 RTT 延迟，但必须标记 `isHealthy = false`（返回 `reachable but unauthorized`）且不重置 `consecutiveFailures`；仅 2xx 或 404 视为探活成功并调用 `RecordSuccess`。
 - **伪本地化防御契约**：所有动态或外部翻译 Key 调用前必须经 `Translator.CanTranslate` 守卫并提供英文退化文本。

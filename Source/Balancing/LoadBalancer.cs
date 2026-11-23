@@ -2,6 +2,8 @@ using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
+using System.Security.Cryptography;
+using System.Text;
 using System.Threading;
 using RimMind.Application.Features.Llm;
 using RimMind.ModelService.Models;
@@ -47,9 +49,20 @@ namespace RimMind.ModelService.Balancing
             if (endpoint == null) return string.Empty;
             string endpointPart = (endpoint.endpoint ?? string.Empty).Trim().TrimEnd('/');
             string modelPart = (endpoint.modelName ?? string.Empty).Trim();
-            string apiKey = endpoint.apiKey ?? string.Empty;
-            string keySuffix = apiKey.Length > 8 ? apiKey.Substring(apiKey.Length - 8) : apiKey;
-            return $"{endpoint.id ?? string.Empty}|{endpointPart}|{modelPart}|{keySuffix}";
+            string keyFingerprint = ComputeApiKeyFingerprint(endpoint.apiKey);
+            return $"{endpoint.id ?? string.Empty}|{endpointPart}|{modelPart}|{keyFingerprint}";
+        }
+
+        private static string ComputeApiKeyFingerprint(string? apiKey)
+        {
+            if (string.IsNullOrEmpty(apiKey))
+                return string.Empty;
+
+            using (var sha = SHA256.Create())
+            {
+                byte[] hash = sha.ComputeHash(Encoding.UTF8.GetBytes(apiKey!));
+                return $"{hash[0]:x2}{hash[1]:x2}{hash[2]:x2}{hash[3]:x2}";
+            }
         }
 
         internal void ObserveNodeRecoveryBaseline(ModelEndpointConfig endpoint)

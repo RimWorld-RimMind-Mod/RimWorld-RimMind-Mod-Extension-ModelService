@@ -39,11 +39,28 @@ namespace RimMind.ModelService.Tests.Contracts
                         "https://api.openai.com/v1/chat/completions",
                         OpenAIModelProtocol.Instance.ResolveCompletionUri(new ModelEndpointConfig { endpoint = "https://api.openai.com/v1/" }).ToString());
                     Assert.Equal(
+                        "https://api.openai.com/v1/chat/completions",
+                        OpenAIModelProtocol.Instance.ResolveCompletionUri(new ModelEndpointConfig { endpoint = "https://api.openai.com/v1/chat/completions" }).ToString());
+                    Assert.Equal(
                         "https://api.anthropic.com/v1/messages",
                         AnthropicModelProtocol.Instance.ResolveCompletionUri(new ModelEndpointConfig { endpoint = "https://api.anthropic.com/v1/" }).ToString());
                     Assert.Equal(
+                        "https://api.anthropic.com/v1/messages",
+                        AnthropicModelProtocol.Instance.ResolveCompletionUri(new ModelEndpointConfig { endpoint = "https://api.anthropic.com/v1/messages" }).ToString());
+                    Assert.Equal(
                         "https://api.deepseek.com/chat/completions",
                         DeepSeekModelProtocol.Instance.ResolveCompletionUri(new ModelEndpointConfig { endpoint = "https://api.deepseek.com/chat/completions" }).ToString());
+
+                    using var anthropicProbe = AnthropicModelProtocol.Instance.BuildHealthProbeRequest(new ModelEndpointConfig
+                    {
+                        endpoint = "https://api.anthropic.com/v1/messages",
+                        apiKey = "sk-ant-test"
+                    });
+                    Assert.Equal("https://api.anthropic.com/v1/models", anthropicProbe.RequestUri?.ToString());
+                    Assert.True(anthropicProbe.Headers.TryGetValues("anthropic-version", out var versionVals));
+                    Assert.Equal("2023-06-01", versionVals!.Single());
+                    Assert.True(anthropicProbe.Headers.TryGetValues("x-api-key", out var antKeyVals));
+                    Assert.Equal("sk-ant-test", antKeyVals!.Single());
                     return Task.CompletedTask;
                 }),
                 ("custom protocol with RequiresLoopback=true and OpenAICompatible legacy type is enforced by both client and health probe", async () =>
@@ -395,8 +412,9 @@ namespace RimMind.ModelService.Tests.Contracts
                     string drawerCode = StripComments(File.ReadAllText(Path.Combine(sourceDir, "Settings", "ModelServiceSettingsDrawer.cs")));
                     Assert.DoesNotContain("OpenCodeGoProtocolId", drawerCode, StringComparison.Ordinal);
                     Assert.DoesNotContain("DeepSeekProtocolId", drawerCode, StringComparison.Ordinal);
+                    Assert.DoesNotContain("ModelEndpointPresets.Create", drawerCode, StringComparison.Ordinal);
                 }),
-                ("zero redundant static HttpClient instantiations across client, probe, and audio services", () =>
+                ("zero redundant static HttpClient instantiations and all authenticated senders use NoRedirect", () =>
                 {
                     string[] files =
                     {
@@ -409,7 +427,8 @@ namespace RimMind.ModelService.Tests.Contracts
                     {
                         string code = StripComments(File.ReadAllText(file));
                         Assert.DoesNotContain("new HttpClient", code, StringComparison.Ordinal);
-                        Assert.Contains("RimMindHttpClientPool", code, StringComparison.Ordinal);
+                        Assert.Contains("RimMindHttpClientPool.NoRedirect", code, StringComparison.Ordinal);
+                        Assert.DoesNotContain("RimMindHttpClientPool.Shared", code, StringComparison.Ordinal);
                     }
                 }),
                 ("SettingsDrawer and DebugActions have zero raw .Translate() calls or local TranslateOrFallback and use shared SettingsUIDrawer", () =>

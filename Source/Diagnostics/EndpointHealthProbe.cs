@@ -49,8 +49,7 @@ namespace RimMind.ModelService.Diagnostics
             var stopwatch = Stopwatch.StartNew();
             try
             {
-                string resolvedUrl = endpoint.endpoint.TrimEnd('/') + "/models";
-                using var request = protocol.BuildHealthProbeRequest(endpoint, resolvedUrl);
+                using var request = protocol.BuildHealthProbeRequest(endpoint);
                 using var response = await sendAsync(request, linkedCts.Token).ConfigureAwait(false);
                 stopwatch.Stop();
                 int latency = (int)stopwatch.ElapsedMilliseconds;

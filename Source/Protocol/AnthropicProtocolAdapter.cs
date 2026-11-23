@@ -17,9 +17,14 @@ namespace RimMind.ModelService.Protocol
     {
         public static string BuildRequestJson(LlmRequestEnvelope envelope, ModelEndpointConfig node)
         {
+            return BuildRequestJson(envelope, node?.modelName);
+        }
+
+        public static string BuildRequestJson(LlmRequestEnvelope envelope, string? modelName)
+        {
             var root = new JObject
             {
-                ["model"] = !string.IsNullOrEmpty(node.modelName) ? node.modelName : "claude-3-5-haiku-20241022",
+                ["model"] = !string.IsNullOrEmpty(modelName) ? modelName! : "claude-3-5-haiku-20241022",
                 ["max_tokens"] = envelope.MaxTokens > 0 ? envelope.MaxTokens : 1024,
                 ["temperature"] = envelope.Temperature
             };
@@ -96,7 +101,7 @@ namespace RimMind.ModelService.Protocol
                             {
                                 ["type"] = "tool_use",
                                 ["id"] = tc.Id ?? Guid.NewGuid().ToString("N"),
-                                ["name"] = tc.Name,
+                                ["name"] = tc.Name?.Replace('.', '_') ?? string.Empty,
                                 ["input"] = inputObj
                             });
                         }

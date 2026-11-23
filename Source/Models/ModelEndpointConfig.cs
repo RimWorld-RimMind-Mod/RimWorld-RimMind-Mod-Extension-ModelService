@@ -11,7 +11,7 @@ namespace RimMind.ModelService.Models
         public string name = "Default Node";
 
         private ProviderType _providerType = ProviderType.OpenAICompatible;
-        private string _protocolId = "";
+        private string _protocolId = ModelProtocolRegistry.OpenAIProtocolId;
 
         public ProviderType providerType
         {
@@ -19,15 +19,23 @@ namespace RimMind.ModelService.Models
             set
             {
                 _providerType = value;
-                if (string.IsNullOrWhiteSpace(_protocolId) || ModelProtocolRegistry.TryGetBuiltInProviderType(_protocolId, out _))
+                if (string.IsNullOrWhiteSpace(_protocolId)
+                    || ModelProtocolRegistry.TryGetBuiltInProviderType(_protocolId, out _))
                 {
                     _protocolId = ModelProtocolRegistry.ToProtocolId(value);
+                    return;
                 }
-                else if (ModelProtocolRegistry.TryGet(_protocolId, out var customProto) && customProto.LegacyProviderType != value)
+
+                if (ModelProtocolRegistry.TryGet(_protocolId, out var customProto))
                 {
-                    _protocolId = ModelProtocolRegistry.ToProtocolId(value);
+                    if (customProto.LegacyProviderType != value)
+                    {
+                        _protocolId = ModelProtocolRegistry.ToProtocolId(value);
+                    }
+                    return;
                 }
-                else if (value != ProviderType.OpenAICompatible)
+
+                if (value != ProviderType.OpenAICompatible)
                 {
                     _protocolId = ModelProtocolRegistry.ToProtocolId(value);
                 }
@@ -46,40 +54,22 @@ namespace RimMind.ModelService.Models
                 }
 
                 string trimmed = value.Trim();
-                if (ModelProtocolRegistry.TryGetBuiltInProviderType(trimmed, out var builtInType))
+                if (ModelProtocolRegistry.TryGet(trimmed, out var protocol))
                 {
-                    _providerType = builtInType;
-                    _protocolId = ModelProtocolRegistry.ToProtocolId(builtInType);
+                    _protocolId = protocol.ProtocolId;
+                    _providerType = protocol.LegacyProviderType;
                 }
                 else
                 {
                     _protocolId = trimmed;
-                    if (ModelProtocolRegistry.TryGet(trimmed, out var customProto))
-                    {
-                        _providerType = customProto.LegacyProviderType;
-                    }
                 }
             }
         }
 
-        public string EffectiveProtocolId
-        {
-            get
-            {
-                if (!string.IsNullOrWhiteSpace(_protocolId))
-                {
-                    string trimmed = _protocolId.Trim();
-                    if (ModelProtocolRegistry.TryGetBuiltInProviderType(trimmed, out var builtInType))
-                    {
-                        return builtInType == _providerType
-                            ? ModelProtocolRegistry.ToProtocolId(builtInType)
-                            : ModelProtocolRegistry.ToProtocolId(_providerType);
-                    }
-                    return trimmed;
-                }
-                return ModelProtocolRegistry.ToProtocolId(_providerType);
-            }
-        }
+        public string EffectiveProtocolId =>
+            !string.IsNullOrWhiteSpace(_protocolId)
+                ? _protocolId.Trim()
+                : ModelProtocolRegistry.ToProtocolId(_providerType);
 
         public string endpoint = "https://api.openai.com/v1";
         public string apiKey = "";
@@ -179,36 +169,20 @@ namespace RimMind.ModelService.Models
         {
             if (string.IsNullOrWhiteSpace(_protocolId))
             {
+                // One-way legacy migration for saves written before protocolId was persisted.
                 _protocolId = ModelProtocolRegistry.ToProtocolId(_providerType);
                 return;
             }
 
             string trimmed = _protocolId.Trim();
-            if (ModelProtocolRegistry.TryGetBuiltInProviderType(trimmed, out var builtInType))
+            if (ModelProtocolRegistry.TryGet(trimmed, out var protocol))
             {
-                if (builtInType != _providerType)
-                {
-                    if (_providerType != ProviderType.OpenAICompatible && builtInType == ProviderType.OpenAICompatible)
-                    {
-                        _protocolId = ModelProtocolRegistry.ToProtocolId(_providerType);
-                    }
-                    else
-                    {
-                        _providerType = builtInType;
-                        _protocolId = ModelProtocolRegistry.ToProtocolId(builtInType);
-                    }
-                }
-                else
-                {
-                    _protocolId = ModelProtocolRegistry.ToProtocolId(builtInType);
-                }
-                return;
+                _protocolId = protocol.ProtocolId;
+                _providerType = protocol.LegacyProviderType;
             }
-
-            _protocolId = trimmed;
-            if (ModelProtocolRegistry.TryGet(trimmed, out var customProto))
+            else
             {
-                _providerType = customProto.LegacyProviderType;
+                _protocolId = trimmed;
             }
         }
 

@@ -115,46 +115,32 @@ namespace RimMind.ModelService.Settings
                 return rect;
             }
 
-            var codexRect = NextButtonRect(140f);
-            if (Widgets.ButtonText(codexRect, RimMindText.TrOr("RimMind.ModelService.Settings.AddCodexPreset", "+ Codex Preset")))
+            foreach (var protocol in ModelProtocolRegistry.All)
             {
-                lock (settings.EndpointSyncRoot)
-                {
-                    settings.endpoints.Add(ModelEndpointPresets.CreateCodexGatewayPreset(settings.endpoints.Count));
-                }
-                GUI.changed = true;
-            }
-            TooltipHandler.TipRegion(
-                codexRect,
-                RimMindText.TrOr("RimMind.ModelService.Settings.AddCodexPreset.Desc", "Quickly add local Codex gateway endpoint preset."));
+                var preset = protocol.PresetDescriptor;
+                if (preset == null)
+                    continue;
 
-            var openCodeRect = NextButtonRect(160f);
-            if (Widgets.ButtonText(openCodeRect, RimMindText.TrOr("RimMind.ModelService.Settings.AddOpenCodeGoPreset", "+ OpenCode Go Preset")))
-            {
-                lock (settings.EndpointSyncRoot)
+                var presetRect = NextButtonRect(preset.ButtonWidth);
+                string label = !string.IsNullOrEmpty(preset.ButtonLabelKey)
+                    ? RimMindText.TrOr(preset.ButtonLabelKey, preset.ButtonLabelFallback)
+                    : preset.ButtonLabelFallback;
+                if (Widgets.ButtonText(presetRect, label))
                 {
-                    settings.endpoints.Add(ModelEndpointPresets.CreateOpenCodeGoPreset(settings.endpoints.Count));
+                    lock (settings.EndpointSyncRoot)
+                    {
+                        settings.endpoints.Add(preset.CreateEndpoint(settings.endpoints.Count));
+                    }
+                    GUI.changed = true;
                 }
-                GUI.changed = true;
-            }
-            TooltipHandler.TipRegion(
-                openCodeRect,
-                RimMindText.TrOr("RimMind.ModelService.Settings.AddOpenCodeGoPreset.Desc", "Quickly add OpenCode Go subscription endpoint preset."));
-
-            var deepSeekRect = NextButtonRect(145f);
-            if (Widgets.ButtonText(deepSeekRect, RimMindText.TrOr("RimMind.ModelService.Settings.AddDeepSeekPreset", "+ DeepSeek Preset")))
-            {
-                lock (settings.EndpointSyncRoot)
+                string tooltip = !string.IsNullOrEmpty(preset.TooltipKey)
+                    ? RimMindText.TrOr(preset.TooltipKey, preset.TooltipFallback)
+                    : preset.TooltipFallback;
+                if (!string.IsNullOrEmpty(tooltip))
                 {
-                    settings.endpoints.Add(ModelEndpointPresets.CreateDeepSeekPreset(settings.endpoints.Count));
+                    TooltipHandler.TipRegion(presetRect, tooltip);
                 }
-                GUI.changed = true;
             }
-            TooltipHandler.TipRegion(
-                deepSeekRect,
-                RimMindText.TrOr(
-                    "RimMind.ModelService.Settings.AddDeepSeekPreset.Desc",
-                    "Quickly add DeepSeek official API node with adaptive thinking & high safety mode."));
 
             var customRect = NextButtonRect(130f);
             if (Widgets.ButtonText(customRect, RimMindText.TrOr("RimMind.ModelService.Settings.AddCustomEndpoint", "+ Custom Node")))
@@ -167,7 +153,6 @@ namespace RimMind.ModelService.Settings
                         name = $"Node {settings.endpoints.Count + 1}",
                         endpoint = "http://127.0.0.1:8000/v1",
                         modelName = defaultProtocol.DefaultModel,
-                        providerType = defaultProtocol.LegacyProviderType,
                         protocolId = defaultProtocol.ProtocolId,
                         priority = settings.endpoints.Count,
                         weight = 1,
@@ -631,7 +616,6 @@ namespace RimMind.ModelService.Settings
                 || string.Equals(endpoint.modelName, previousProtocol.DefaultModel, StringComparison.OrdinalIgnoreCase);
 
             endpoint.protocolId = selectedProtocol.ProtocolId;
-            endpoint.providerType = selectedProtocol.LegacyProviderType;
 
             if (updateUrl && !string.IsNullOrWhiteSpace(selectedProtocol.DefaultEndpointUrl))
             {
@@ -658,7 +642,7 @@ namespace RimMind.ModelService.Settings
             foreach (var node in snapshot)
             {
                 var targetNode = node;
-                if (targetNode == null) continue;
+                if (targetNode == null || !targetNode.isEnabled) continue;
                 _probingNodes[targetNode.id] = true;
                 Task.Run(async () =>
                 {

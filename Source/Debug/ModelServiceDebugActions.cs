@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Threading.Tasks;
 using LudeonTK;
 using RimMind.ModelService.Diagnostics;
@@ -11,12 +12,22 @@ namespace RimMind.ModelService.Debug
 {
     public static class ModelServiceDebugActions
     {
-        [DebugAction("RimMind - ModelService", "Test All Endpoints (OpenCode Go / Codex)", actionType = DebugActionType.Action)]
+        [DebugAction("RimMind - ModelService", "Test All Enabled Endpoints", actionType = DebugActionType.Action)]
         public static void TestAllEndpoints()
         {
             var settings = RimMindModelServiceMod.Settings;
             var snapshot = settings?.GetEndpointsSnapshot() ?? Array.Empty<ModelEndpointConfig>();
-            if (snapshot.Length == 0)
+            var enabledNodes = new List<ModelEndpointConfig>(snapshot.Length);
+            for (int i = 0; i < snapshot.Length; i++)
+            {
+                var ep = snapshot[i];
+                if (ep != null && ep.isEnabled)
+                {
+                    enabledNodes.Add(ep);
+                }
+            }
+
+            if (enabledNodes.Count == 0)
             {
                 Messages.Message(
                     RimMindText.TrOr(
@@ -31,14 +42,13 @@ namespace RimMind.ModelService.Debug
                 RimMindText.TrOr(
                     "RimMind.ModelService.Debug.ProbingAll",
                     "[ModelService] Probing all {0} model service node(s)...",
-                    snapshot.Length),
+                    enabledNodes.Count),
                 MessageTypeDefOf.NeutralEvent,
                 false);
 
-            foreach (var node in snapshot)
+            foreach (var node in enabledNodes)
             {
                 var targetNode = node;
-                if (targetNode == null) continue;
                 Task.Run(async () =>
                 {
                     var (isOk, rttMs, error) = await EndpointHealthProbe.ProbeEndpointAsync(targetNode);

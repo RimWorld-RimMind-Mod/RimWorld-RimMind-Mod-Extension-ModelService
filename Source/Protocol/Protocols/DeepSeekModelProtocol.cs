@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Net.Http;
 using RimMind.Domain.Common;
 using RimMind.Domain.Llm;
@@ -8,9 +9,11 @@ using CoreHttpErrorClassifier = RimMind.Application.Features.Llm.HttpErrorClassi
 
 namespace RimMind.ModelService.Protocol
 {
-    public sealed class DeepSeekModelProtocol : IContextualModelProtocol
+    public sealed class DeepSeekModelProtocol : IModelProtocol
     {
         public static readonly DeepSeekModelProtocol Instance = new DeepSeekModelProtocol();
+
+        private static readonly string[] Aliases = { nameof(ProviderType.DeepSeekOfficial), "deepseek_native" };
 
         private static readonly ProtocolCapabilities ProtocolCaps = new ProtocolCapabilities(
             supportsNativeThinking: true,
@@ -19,13 +22,43 @@ namespace RimMind.ModelService.Protocol
             requiresReasoningContentInToolHistory: true,
             requiresLoopback: false);
 
+        private static readonly ProtocolEnvBinding EnvBinding = new ProtocolEnvBinding(
+            apiKeyVars: new[] { "RIMMIND_DEEPSEEK_API_KEY", "DEEPSEEK_API_KEY" },
+            endpointVars: new[] { "RIMMIND_DEEPSEEK_ENDPOINT" },
+            modelVars: new[] { "RIMMIND_DEEPSEEK_MODEL" });
+
+        private static readonly ProtocolPresetDescriptor Preset = new ProtocolPresetDescriptor(
+            buttonLabelKey: "RimMind.ModelService.Settings.AddDeepSeekPreset",
+            buttonLabelFallback: "+ DeepSeek Preset",
+            tooltipKey: "RimMind.ModelService.Settings.AddDeepSeekPreset.Desc",
+            tooltipFallback: "Quickly add DeepSeek official API node with adaptive thinking & high safety mode.",
+            buttonWidth: 145f,
+            createEndpoint: priority => new ModelEndpointConfig
+            {
+                id = Guid.NewGuid().ToString("N"),
+                name = "DeepSeek Official",
+                endpoint = Instance.DefaultEndpointUrl,
+                modelName = Instance.DefaultModel,
+                protocolId = ModelProtocolRegistry.DeepSeekProtocolId,
+                providerType = ProviderType.DeepSeekOfficial,
+                timeoutSeconds = 60,
+                isEnabled = false,
+                thinkingPolicy = EndpointThinkingPolicy.FollowRequest,
+                safetyLevel = EndpointSafetyLevel.High,
+                priority = priority,
+                weight = 1
+            });
+
         public string ProtocolId => ModelProtocolRegistry.DeepSeekProtocolId;
         public ProviderType LegacyProviderType => ProviderType.DeepSeekOfficial;
+        public IReadOnlyList<string> LegacyAliases => Aliases;
         public string DisplayLabelKey => "RimMind.ModelService.Provider.DeepSeekOfficial";
         public string FallbackLabel => "DeepSeek Official";
         public string DefaultEndpointUrl => "https://api.deepseek.com";
         public string DefaultModel => DeepSeekProtocolAdapter.DefaultModelName;
         public ProtocolCapabilities Capabilities => ProtocolCaps;
+        public ProtocolPresetDescriptor? PresetDescriptor => Preset;
+        public ProtocolEnvBinding? EnvOverrideBinding => EnvBinding;
 
         internal static string ResolveBaseUrl(string? rawEndpoint, string fallback)
         {
@@ -45,8 +78,11 @@ namespace RimMind.ModelService.Protocol
             return new Uri(baseUrl + "/chat/completions");
         }
 
-        public Result<string, RimMindError> BuildRequestJson(LlmRequestEnvelope envelope, string modelOverride) =>
-            BuildRequestJson(envelope, new ModelEndpointConfig { modelName = modelOverride }, modelOverride);
+        public Uri ResolveHealthProbeUri(ModelEndpointConfig endpoint)
+        {
+            string baseUrl = ResolveBaseUrl(endpoint?.endpoint, DefaultEndpointUrl);
+            return new Uri(baseUrl + "/models");
+        }
 
         public Result<string, RimMindError> BuildRequestJson(
             LlmRequestEnvelope envelope,
@@ -70,28 +106,15 @@ namespace RimMind.ModelService.Protocol
         {
             if (request == null || endpoint == null) return;
 
-            if (request.Method == HttpMethod.Post && !string.IsNullOrWhiteSpace(endpoint.endpoint))
-            {
-                request.RequestUri = ResolveCompletionUri(endpoint);
-            }
-            else if (request.RequestUri == null && !string.IsNullOrWhiteSpace(endpoint.endpoint))
-            {
-                string baseUrl = ResolveBaseUrl(endpoint.endpoint, DefaultEndpointUrl);
-                request.RequestUri = new Uri(baseUrl + "/models");
-            }
-
             if (!string.IsNullOrEmpty(endpoint.apiKey))
             {
                 request.Headers.TryAddWithoutValidation("Authorization", "Bearer " + endpoint.apiKey);
             }
         }
 
-        public HttpRequestMessage BuildHealthProbeRequest(ModelEndpointConfig endpoint, string resolvedUrl)
+        public HttpRequestMessage BuildHealthProbeRequest(ModelEndpointConfig endpoint)
         {
-            string baseUrl = endpoint != null && !string.IsNullOrWhiteSpace(endpoint.endpoint)
-                ? ResolveBaseUrl(endpoint.endpoint, DefaultEndpointUrl)
-                : ResolveBaseUrl(resolvedUrl, DefaultEndpointUrl);
-            var request = new HttpRequestMessage(HttpMethod.Get, baseUrl + "/models");
+            var request = new HttpRequestMessage(HttpMethod.Get, ResolveHealthProbeUri(endpoint));
             if (endpoint != null)
             {
                 ApplyHeaders(request, endpoint, "health-probe");

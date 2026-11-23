@@ -38,7 +38,7 @@ namespace RimMind.ModelService.Audio
             Func<HttpRequestMessage, CancellationToken, Task<HttpResponseMessage>>? httpSendOverride,
             Func<(string rootBaseUrl, string apiKey)?>? credentialResolver = null)
         {
-            _httpSend = httpSendOverride ?? ((req, ct) => RimMindHttpClientPool.Shared.SendAsync(req, ct));
+            _httpSend = httpSendOverride ?? ((req, ct) => RimMindHttpClientPool.NoRedirect.SendAsync(req, ct));
             _credentialResolver = credentialResolver ?? DeepSeekAudioEndpointResolver.Resolve;
         }
 

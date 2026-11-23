@@ -1,10 +1,7 @@
-using System;
-using System.Collections.Generic;
 using RimMind.Application.Common.Helpers;
 using RimMind.Application.Common.Interfaces.Client;
 using RimMind.Application.Common.Interfaces.Internal;
 using RimMind.ModelService.Models;
-using RimMind.ModelService.Settings;
 
 namespace RimMind.ModelService.Client
 {
@@ -55,14 +52,12 @@ namespace RimMind.ModelService.Client
             var envOverlay = EnvironmentEndpointOverlay.FromEnvironment();
 
             return new ModelServiceClient(
-                () =>
-                {
-                    if (msSettings == null || !msSettings.enableService || msSettings.endpoints == null)
-                        return Array.Empty<ModelEndpointConfig>();
-                    return envOverlay == null
-                        ? msSettings.endpoints
-                        : envOverlay.Apply(msSettings.endpoints);
-                },
+                () => EndpointPoolResolver.GetEndpoints(
+                    msSettings,
+                    envOverlay,
+                    protocolIdFilter: null,
+                    requireEnableService: true,
+                    enabledOnly: false),
                 () => msSettings?.balancingStrategy ?? BalancingStrategy.PriorityFailover);
         }
     }

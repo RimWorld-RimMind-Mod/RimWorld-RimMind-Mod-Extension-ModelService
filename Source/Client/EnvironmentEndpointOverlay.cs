@@ -27,40 +27,6 @@ namespace RimMind.ModelService.Client
             public string? Model { get; }
         }
 
-        private sealed class ProtocolEnvBinding
-        {
-            public ProtocolEnvBinding(
-                string protocolId,
-                string[] apiKeyVars,
-                string[] endpointVars,
-                string[] modelVars)
-            {
-                ProtocolId = protocolId;
-                ApiKeyVars = apiKeyVars;
-                EndpointVars = endpointVars;
-                ModelVars = modelVars;
-            }
-
-            public string ProtocolId { get; }
-            public string[] ApiKeyVars { get; }
-            public string[] EndpointVars { get; }
-            public string[] ModelVars { get; }
-        }
-
-        private static readonly ProtocolEnvBinding[] DefaultBindings =
-        {
-            new ProtocolEnvBinding(
-                ModelProtocolRegistry.OpenCodeGoProtocolId,
-                new[] { "RIMMIND_BACKUP_API_KEY", "RIMMIND_TEST_API_KEY" },
-                new[] { "RIMMIND_BACKUP_ENDPOINT", "RIMMIND_TEST_ENDPOINT" },
-                new[] { "RIMMIND_BACKUP_MODEL", "RIMMIND_TEST_MODEL" }),
-            new ProtocolEnvBinding(
-                ModelProtocolRegistry.DeepSeekProtocolId,
-                new[] { "RIMMIND_DEEPSEEK_API_KEY", "DEEPSEEK_API_KEY" },
-                new[] { "RIMMIND_DEEPSEEK_ENDPOINT" },
-                new[] { "RIMMIND_DEEPSEEK_MODEL" })
-        };
-
         private readonly Dictionary<string, ProtocolEnvOverride> _overridesByProtocol;
         private readonly ConcurrentDictionary<string, ModelEndpointConfig> _shadows =
             new ConcurrentDictionary<string, ModelEndpointConfig>(StringComparer.Ordinal);
@@ -76,16 +42,21 @@ namespace RimMind.ModelService.Client
             getEnv ??= Environment.GetEnvironmentVariable;
             var overrides = new Dictionary<string, ProtocolEnvOverride>(StringComparer.OrdinalIgnoreCase);
 
-            for (int i = 0; i < DefaultBindings.Length; i++)
+            var protocols = ModelProtocolRegistry.All;
+            for (int i = 0; i < protocols.Count; i++)
             {
-                var binding = DefaultBindings[i];
+                var protocol = protocols[i];
+                var binding = protocol.EnvOverrideBinding;
+                if (binding == null || binding.ApiKeyVars.Length == 0)
+                    continue;
+
                 string? key = FirstNonWhiteSpace(getEnv, binding.ApiKeyVars);
                 if (string.IsNullOrWhiteSpace(key))
                     continue;
 
                 string? endpoint = FirstNonNull(getEnv, binding.EndpointVars);
                 string? model = FirstNonNull(getEnv, binding.ModelVars);
-                overrides[binding.ProtocolId] = new ProtocolEnvOverride(key!, endpoint, model);
+                overrides[protocol.ProtocolId] = new ProtocolEnvOverride(key!, endpoint, model);
             }
 
             return overrides.Count > 0 ? new EnvironmentEndpointOverlay(overrides) : null;

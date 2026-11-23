@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Net.Http;
 using RimMind.Domain.Common;
 using RimMind.Domain.Llm;
@@ -7,20 +8,47 @@ using RimMind.ModelService.Models;
 
 namespace RimMind.ModelService.Protocol
 {
-    public interface IModelProtocol
+    public sealed class ProtocolEnvBinding
     {
-        string ProtocolId { get; }
-        ProviderType LegacyProviderType { get; }
-        string DisplayLabelKey { get; }
-        string FallbackLabel { get; }
-        string DefaultEndpointUrl { get; }
-        string DefaultModel { get; }
-        ProtocolCapabilities Capabilities { get; }
-        Uri ResolveCompletionUri(ModelEndpointConfig endpoint);
-        Result<string, RimMindError> BuildRequestJson(LlmRequestEnvelope envelope, string modelOverride);
-        Result<LlmResponse, RimMindError> ParseResponse(string responseBody, LlmRequestEnvelope? envelope = null);
-        void ApplyHeaders(HttpRequestMessage request, ModelEndpointConfig endpoint, string? requestId);
-        HttpRequestMessage BuildHealthProbeRequest(ModelEndpointConfig endpoint, string resolvedUrl);
+        public ProtocolEnvBinding(
+            string[] apiKeyVars,
+            string[]? endpointVars = null,
+            string[]? modelVars = null)
+        {
+            ApiKeyVars = apiKeyVars ?? Array.Empty<string>();
+            EndpointVars = endpointVars ?? Array.Empty<string>();
+            ModelVars = modelVars ?? Array.Empty<string>();
+        }
+
+        public string[] ApiKeyVars { get; }
+        public string[] EndpointVars { get; }
+        public string[] ModelVars { get; }
+    }
+
+    public sealed class ProtocolPresetDescriptor
+    {
+        public ProtocolPresetDescriptor(
+            string buttonLabelKey,
+            string buttonLabelFallback,
+            string tooltipKey,
+            string tooltipFallback,
+            float buttonWidth,
+            Func<int, ModelEndpointConfig> createEndpoint)
+        {
+            ButtonLabelKey = buttonLabelKey ?? string.Empty;
+            ButtonLabelFallback = buttonLabelFallback ?? string.Empty;
+            TooltipKey = tooltipKey ?? string.Empty;
+            TooltipFallback = tooltipFallback ?? string.Empty;
+            ButtonWidth = buttonWidth;
+            CreateEndpoint = createEndpoint ?? throw new ArgumentNullException(nameof(createEndpoint));
+        }
+
+        public string ButtonLabelKey { get; }
+        public string ButtonLabelFallback { get; }
+        public string TooltipKey { get; }
+        public string TooltipFallback { get; }
+        public float ButtonWidth { get; }
+        public Func<int, ModelEndpointConfig> CreateEndpoint { get; }
     }
 
     public sealed class ProtocolCapabilities
@@ -63,9 +91,30 @@ namespace RimMind.ModelService.Protocol
         public static ProtocolCapabilities Default { get; } = new ProtocolCapabilities();
     }
 
-    public interface IContextualModelProtocol : IModelProtocol
+    /// <summary>
+    /// Unified pluggable contract for ModelService wire protocols.
+    /// Encapsulates URI resolution, request serialization, response parsing, HTTP error classification,
+    /// header decoration, health probing, optional preset metadata, and optional environment-overlay bindings.
+    /// </summary>
+    public interface IModelProtocol
     {
+        string ProtocolId { get; }
+        ProviderType LegacyProviderType { get; }
+        IReadOnlyList<string> LegacyAliases { get; }
+        string DisplayLabelKey { get; }
+        string FallbackLabel { get; }
+        string DefaultEndpointUrl { get; }
+        string DefaultModel { get; }
+        ProtocolCapabilities Capabilities { get; }
+        ProtocolPresetDescriptor? PresetDescriptor { get; }
+        ProtocolEnvBinding? EnvOverrideBinding { get; }
+
+        Uri ResolveCompletionUri(ModelEndpointConfig endpoint);
+        Uri ResolveHealthProbeUri(ModelEndpointConfig endpoint);
         Result<string, RimMindError> BuildRequestJson(LlmRequestEnvelope envelope, ModelEndpointConfig endpoint, string modelOverride);
+        Result<LlmResponse, RimMindError> ParseResponse(string responseBody, LlmRequestEnvelope? envelope = null);
         RimMindError ClassifyHttpError(int statusCode, string sanitizedBody, ModelEndpointConfig endpoint);
+        void ApplyHeaders(HttpRequestMessage request, ModelEndpointConfig endpoint, string? requestId);
+        HttpRequestMessage BuildHealthProbeRequest(ModelEndpointConfig endpoint);
     }
 }

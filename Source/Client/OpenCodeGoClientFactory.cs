@@ -1,9 +1,7 @@
-using System;
 using RimMind.Application.Common.Interfaces.Client;
 using RimMind.Application.Common.Interfaces.Internal;
 using RimMind.ModelService.Models;
 using RimMind.ModelService.Protocol;
-using RimMind.ModelService.Settings;
 
 namespace RimMind.ModelService.Client
 {
@@ -42,7 +40,6 @@ namespace RimMind.ModelService.Client
                 endpoint = endpointUrl,
                 modelName = model,
                 apiKey = apiKey,
-                providerType = protocol.LegacyProviderType,
                 protocolId = protocol.ProtocolId,
                 isEnabled = !string.IsNullOrWhiteSpace(apiKey),
                 priority = 0,

@@ -5,7 +5,7 @@
     <TargetFramework>net10.0</TargetFramework>
     <RootNamespace>RimMind.ModelService.Tests</RootNamespace>
     <AssemblyName>RimMindModelService.Tests</AssemblyName>
-    <LangVersion>12.0</LangVersion>
+    <LangVersion>9.0</LangVersion>
     <Nullable>enable</Nullable>
     <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
   </PropertyGroup>
@@ -24,19 +24,20 @@
 
   <ItemGroup>
     <Compile Include="VerseStubs.cs" />
+    <Compile Include="TestSettingsStub.cs" />
     <Compile Include="Contracts\**\*.cs" />
     <Compile Include="..\..\RimMind-Core\TestSupport\ContractCaseRunner.cs"
              Link="Support\ContractCaseRunner.cs" />
     <Compile Include="../Source/Models/ProviderType.cs" />
     <Compile Include="../Source/Models/ModelEndpointConfig.cs" />
     <Compile Include="../Source/Models/ModelEndpointPresets.cs" />
+    <Compile Include="../Source/Client/EndpointPoolResolver.cs" />
     <Compile Include="../Source/Client/EnvironmentEndpointOverlay.cs" />
     <Compile Include="../Source/Settings/ModelServiceSettings.cs" />
     <Compile Include="../Source/Security/LocalLoopbackValidator.cs" />
     <Compile Include="../Source/Security/SecretRedactor.cs" />
     <Compile Include="../Source/Balancing/LoadBalancer.cs" />
     <Compile Include="../Source/Protocol/IModelProtocol.cs" />
-    <Compile Include="../Source/Protocol/HttpErrorClassifier.cs" />
     <Compile Include="../Source/Protocol/ModelProtocolRegistry.cs" />
     <Compile Include="../Source/Protocol/Protocols/*.cs" />
     <Compile Include="../Source/Protocol/OpenAIProtocolAdapter.cs" />

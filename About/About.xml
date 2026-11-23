@@ -3,7 +3,7 @@
   <name>RimMind - Extension - ModelService</name>
   <author>mcocdaa</author>
   <packageId>mcocdaa.RimMindModelService</packageId>
-  <modVersion>1.0.0</modVersion>
+  <modVersion>2.0.0</modVersion>
   <supportedVersions>
     <li>1.6</li>
     <li>1.7</li>
@@ -30,15 +30,16 @@ RimMind is an enterprise-grade, AI-powered RimWorld mod suite. Integrated with L
 [tr][td]RimMind-Dialogue[/td][td]Contextual spoken dialogue via express_dialogue ToolCall &amp; speech bubbles[/td][td]Core[/td][td][url=https://github.com/RimWorld-RimMind-Mod/RimWorld-RimMind-Mod-Dialogue]Link[/url][/td][/tr]
 [tr][td]RimMind-Memory[/td][td]3-Tier cognitive memory hierarchy, work aggregation &amp; temporal decay[/td][td]Core[/td][td][url=https://github.com/RimWorld-RimMind-Mod/RimWorld-RimMind-Mod-Memory]Link[/url][/td][/tr]
 [tr][td]RimMind-Personality[/td][td]Big-Five psychological profiles, dawn monologues &amp; dynamic mood thoughts[/td][td]Core[/td][td][url=https://github.com/RimWorld-RimMind-Mod/RimWorld-RimMind-Mod-Personality]Link[/url][/td][/tr]
-[tr][td]RimMind-Storyteller[/td][td]AI Story Director, dramatic tension curve, chained arcs &amp; Storyteller Altar[/td][td]Core, Memory[/td][td][url=https://github.com/RimWorld-RimMind-Mod/RimWorld-RimMind-Mod-Storyteller]Link[/url][/td][/tr]
+[tr][td]RimMind-Storyteller[/td][td]AI Story Director, dramatic tension curve, chained arcs &amp; Storyteller Altar[/td][td]Core (Memory optional)[/td][td][url=https://github.com/RimWorld-RimMind-Mod/RimWorld-RimMind-Mod-Storyteller]Link[/url][/td][/tr]
 [tr][td][b]RimMind-Extension-ModelService[/b][/td][td]Multi-provider routing, Anthropic KV cache, local gateways &amp; load balancing[/td][td]Core[/td][td][url=https://github.com/RimWorld-RimMind-Mod/RimWorld-RimMind-Mod-Extension-ModelService]Link[/url][/td][/tr]
 [tr][td]RimMind-Bridge-RimChat[/td][td]RimChat compatibility bridge: dialogue/action mutual exclusion &amp; context sync[/td][td]Core, RimChat[/td][td][url=https://github.com/RimWorld-RimMind-Mod/RimWorld-RimMind-Mod-Bridge-RimChat]Link[/url][/td][/tr]
 [tr][td]RimMind-Bridge-RimTalk[/td][td]RimTalk compatibility bridge: bubble harmonization &amp; bidirectional context[/td][td]Core, RimTalk[/td][td][url=https://github.com/RimWorld-RimMind-Mod/RimWorld-RimMind-Mod-Bridge-RimTalk]Link[/url][/td][/tr]
 [/table]
 [code]Core ──┬── Actions ── Advisor
        ├── Dialogue
-       ├── Memory ── Storyteller
+       ├── Memory
        ├── Personality
+       ├── Storyteller (optional Memory integration)
        ├── Extension-ModelService
        ├── Bridge-RimChat
        └── Bridge-RimTalk[/code]
@@ -49,7 +50,7 @@ RimMind is an enterprise-grade, AI-powered RimWorld mod suite. Integrated with L
 [*][b]Anthropic Ephemeral KV-Cache Adapter[/b] - Native Anthropic [code]/v1/messages[/code] protocol support that automatically tags static Zone 1 &amp; Zone 2 prefix blocks with [code]cache_control: ephemeral[/code], slashing Claude latency and token costs.
 [*][b]OpenCode Go &amp; Local Gateway Presets[/b] - One-click setup for OpenCode Go ([code]https://opencode.ai/zen/go/v1[/code] with [code]x-opencode-session[/code] isolation) and local proxy gateways (Codex, Sub2API, NewAPI).
 [*][b]Local Loopback Security Guard ([code]LocalLoopbackValidator[/code])[/b] - Strictly verifies loopback addresses ([code]127.0.0.1[/code], [code]localhost[/code], [code]::1[/code]) for local subscription proxies to prevent accidental token leakage over public networks.
-[*][b]Priority Failover &amp; Round-Robin Load Balancing[/b] - Automatically shifts traffic away from rate-limited (HTTP 429) or unhealthy (5xx/timeout) nodes for 60 seconds, with one-click millisecond RTT health probing ([code]EndpointHealthProbe[/code]) and F8 Debug Hub telemetry.
+[*][b]Priority Failover &amp; Round-Robin Load Balancing[/b] - Automatically shifts traffic away from rate-limited (HTTP 429) or unhealthy (5xx/timeout) nodes with automatic circuit isolation, plus one-click millisecond RTT health probing ([code]EndpointHealthProbe[/code]) in Mod Settings and DevMode DebugActions.
 [/list]
 
 [h2]Supported Gateway Modes[/h2]
@@ -64,7 +65,7 @@ RimMind is an enterprise-grade, AI-powered RimWorld mod suite. Integrated with L
 
 [h2]Frequently Asked Questions[/h2]
 [b]Q: How do I enable multi-node load balancing?[/b]
-A: Open [b]Options / Mod Settings / RimMind - Extended Model Service[/b], enable Extended Service, choose [i]PriorityFailover[/i] or [i]RoundRobin[/i], and add your endpoint nodes.
+A: Open [b]Options / Mod Settings / RimMind - Model Service[/b] (or the [b]Model Service[/b] tab inside RimMind settings), enable Extended Model Service, choose [i]PriorityFailover[/i] or [i]RoundRobin[/i], and add your endpoint nodes.
 
 [b]Q: What happens if my primary endpoint hits a 429 rate limit?[/b]
 A: The load balancer immediately isolates the degraded node for 60 seconds and transparently retries the request on your next healthy backup node without dropping the colonist's action.</description>

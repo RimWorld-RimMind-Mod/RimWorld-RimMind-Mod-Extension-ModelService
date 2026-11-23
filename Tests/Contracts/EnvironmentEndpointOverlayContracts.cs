@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using RimMind.ModelService.Client;
 using RimMind.ModelService.Models;
+using RimMind.ModelService.Protocol;
 using Xunit;
 
 namespace RimMind.ModelService.Tests.Contracts
@@ -48,6 +49,47 @@ namespace RimMind.ModelService.Tests.Contracts
         public void No_environment_key_means_no_overlay()
         {
             Assert.Null(EnvironmentEndpointOverlay.FromEnvironment(_ => null));
+        }
+
+        [Fact]
+        public void Custom_protocol_EnvOverrideBinding_is_discovered_dynamically()
+        {
+            var custom = new CustomEnvBoundProtocol();
+            ModelProtocolRegistry.Register(custom);
+            try
+            {
+                var customEnv = new Dictionary<string, string>
+                {
+                    ["RIMMIND_CUSTOM_PROTO_KEY"] = "sk-custom-env-123",
+                    ["RIMMIND_CUSTOM_PROTO_URL"] = "https://custom-env.example/v1",
+                    ["RIMMIND_CUSTOM_PROTO_MODEL"] = "custom-v2"
+                };
+                var overlay = EnvironmentEndpointOverlay.FromEnvironment(k => customEnv.TryGetValue(k, out var v) ? v : null);
+                Assert.NotNull(overlay);
+
+                var node = new ModelEndpointConfig { id = "c1", protocolId = custom.ProtocolId, apiKey = "" };
+                var applied = overlay!.Apply(new[] { node });
+                Assert.Equal(string.Empty, node.apiKey);
+                Assert.Equal("sk-custom-env-123", applied[0].apiKey);
+                Assert.Equal("https://custom-env.example/v1", applied[0].endpoint);
+                Assert.Equal("custom-v2", applied[0].modelName);
+            }
+            finally
+            {
+                ModelProtocolRegistry.Unregister(custom.ProtocolId);
+            }
+        }
+
+        private sealed class CustomEnvBoundProtocol : OpenAIModelProtocol
+        {
+            private static readonly ProtocolEnvBinding Binding = new ProtocolEnvBinding(
+                apiKeyVars: new[] { "RIMMIND_CUSTOM_PROTO_KEY" },
+                endpointVars: new[] { "RIMMIND_CUSTOM_PROTO_URL" },
+                modelVars: new[] { "RIMMIND_CUSTOM_PROTO_MODEL" });
+
+            public override string ProtocolId => "custom_env_bound";
+            public override string FallbackLabel => "Custom Env Bound";
+            public override ProtocolEnvBinding? EnvOverrideBinding => Binding;
         }
     }
 }

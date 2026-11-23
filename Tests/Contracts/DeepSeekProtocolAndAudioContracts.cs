@@ -7,7 +7,6 @@ using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using Newtonsoft.Json.Linq;
-using RimMind.Application.Common.Interfaces.Internal;
 using RimMind.Domain.Audio;
 using RimMind.Domain.Llm;
 using RimMind.Domain.ValueObjects;
@@ -23,95 +22,6 @@ namespace RimMind.ModelService.Tests.Contracts
 {
     public sealed class DeepSeekProtocolAndAudioContracts
     {
-        private sealed class LocalSettingsStub : ISettingsProvider
-        {
-            public string ApiKey { get; set; } = "";
-            public string ApiEndpoint { get; set; } = "";
-            public string ModelName { get; set; } = "";
-            public string Provider { get; set; } = "deepseek_native";
-            public bool ForceJsonMode { get; set; } = true;
-            public int MaxTokens { get; set; } = 800;
-            public float DefaultTemperature { get; set; } = 0.7f;
-            public bool DebugLogging { get; set; }
-            public int MaxConcurrentRequests { get; set; } = 2;
-            public int MaxRetryCount { get; set; } = 2;
-            public int RequestTimeoutMs { get; set; } = 30000;
-            public int RequestExpireTicks { get; set; } = 600;
-            public int BehaviorHistoryMax { get; set; } = 10;
-            public int QueueProcessInterval { get; set; } = 10;
-            public int DefaultModCooldownTicks { get; set; } = 600;
-            public float ActivityFrequencyScale { get; set; } = 1.0f;
-            public bool AutoActivateColonistAgents { get; set; }
-            public bool IsConfigured => !string.IsNullOrEmpty(ApiKey);
-            public bool IsOpenAIConfigured() => !string.IsNullOrEmpty(ApiKey);
-            public void Persist() { }
-            public int AgentTickInterval => 600;
-            public int ThinkCooldownTicks => 300;
-            public int MaxToolCallDepth => 3;
-            public string Player2RemoteUrl { get; set; } = "";
-            public IReadOnlyList<RimMind.Application.Common.Models.Client.BackupEndpointNode>? BackupEndpoints => null;
-            public int CircuitBreakerFailureThreshold => 5;
-            public int CircuitBreakerOpenDurationSec => 60;
-            public int ContextCalibrateInterval { get; set; } = 1200;
-            public int ContextDiffLifetimeTicks { get; set; } = 600;
-            public bool RequestOverlayEnabled { get; set; } = true;
-            public float RequestOverlayX { get; set; } = 20f;
-            public float RequestOverlayY { get; set; } = 20f;
-            public float RequestOverlayW { get; set; } = 300f;
-            public float RequestOverlayH { get; set; } = 200f;
-            public bool ShowAgentProgressFloat { get; set; }
-            public bool RequestOverlayAutoHideWhenEmpty { get; set; } = true;
-            public bool EnableFloatingMentalMonitor { get; set; }
-            public string CustomPawnPrompt { get; set; } = "";
-            public string CustomMapPrompt { get; set; } = "";
-            public RimMind.Domain.Enums.FlywheelAutoApplyMode AutoApplyMode { get; set; }
-            public float AutoApplyConfidenceThreshold { get; set; } = 0.8f;
-            public RimMind.Domain.Enums.AgentAutonomyLevel AutonomyLevel { get; set; }
-            public bool ShouldApproveAction(RimMind.Domain.Enums.RiskLevel risk) => true;
-            public IContextSettings Context => this;
-            public float ContextBudget { get; set; } = 1000f;
-            public int ContextBriefLimit => 200;
-            public int EnvironmentScanRadius => 15;
-            public int EnvironmentMaxItems => 10;
-            public float ThreatThresholdHigh => 0.8f;
-            public float ThreatThresholdMedium => 0.5f;
-            public float ThreatThresholdLow => 0.2f;
-            public int MaxCacheEntries => 100;
-            public float MoodDiffThreshold => 0.1f;
-            public float TemperatureDiffThreshold => 5f;
-            public bool IncludeRace { get; set; } = true;
-            public bool IncludeAge { get; set; } = true;
-            public bool IncludeGender { get; set; } = true;
-            public bool IncludeBackstory { get; set; } = true;
-            public bool IncludeIdeology { get; set; }
-            public bool IncludeTraits { get; set; } = true;
-            public bool IncludeSkills { get; set; } = true;
-            public int MinSkillLevel { get; set; }
-            public bool IncludeHealth { get; set; } = true;
-            public bool IncludeCapacities { get; set; } = true;
-            public bool IncludeMood { get; set; } = true;
-            public bool IncludeMoodThoughts { get; set; }
-            public bool IncludeCurrentJob { get; set; } = true;
-            public bool IncludeWorkPriorities { get; set; } = true;
-            public bool IncludeEquipment { get; set; } = true;
-            public bool IncludeInventory { get; set; }
-            public bool IncludeLocation { get; set; }
-            public bool IncludeRelations { get; set; } = true;
-            public bool IncludeGenes { get; set; } = true;
-            public bool IncludeSurroundings { get; set; }
-            public bool IncludeCombatStatus { get; set; } = true;
-            public bool IncludeGameTime { get; set; } = true;
-            public bool IncludeColonistCount { get; set; } = true;
-            public bool IncludeColonistNames { get; set; } = true;
-            public bool IncludeWealth { get; set; }
-            public bool IncludeFood { get; set; } = true;
-            public bool IncludeSeason { get; set; } = true;
-            public bool IncludeWeather { get; set; } = true;
-            public bool IncludeThreats { get; set; } = true;
-            public void ApplyPreset(RimMind.Domain.Enums.ContextPreset preset) { }
-            public void ResetToDefault() { }
-        }
-
         [Fact]
         public void DeepSeekProtocolAdapter_normalizes_models_thinking_safety_conflicts_and_tool_history()
         {
@@ -436,11 +346,10 @@ namespace RimMind.ModelService.Tests.Contracts
                     var protocol = ModelProtocolRegistry.Resolve(ModelProtocolRegistry.ToProtocolId(ProviderType.DeepSeekOfficial));
                     Assert.Same(DeepSeekModelProtocol.Instance, protocol);
                     Assert.Equal("deepseek", protocol.ProtocolId);
-                    var contextual = Assert.IsAssignableFrom<IContextualModelProtocol>(protocol);
-                    Assert.True(contextual.Capabilities.SupportsNativeThinking);
-                    Assert.True(contextual.Capabilities.SupportsSafetyCheck);
-                    Assert.False(contextual.Capabilities.SupportsJsonSchema);
-                    Assert.True(contextual.Capabilities.RequiresReasoningContentInToolHistory);
+                    Assert.True(protocol.Capabilities.SupportsNativeThinking);
+                    Assert.True(protocol.Capabilities.SupportsSafetyCheck);
+                    Assert.False(protocol.Capabilities.SupportsJsonSchema);
+                    Assert.True(protocol.Capabilities.RequiresReasoningContentInToolHistory);
 
                     var epWithSuffix = new ModelEndpointConfig
                     {
@@ -449,12 +358,17 @@ namespace RimMind.ModelService.Tests.Contracts
                         protocolId = "deepseek"
                     };
 
-                    using var postReq = new HttpRequestMessage(HttpMethod.Post, "https://api.deepseek.com/chat/completions/chat/completions");
+                    Uri completionUri = protocol.ResolveCompletionUri(epWithSuffix);
+                    Assert.Equal("https://api.deepseek.com/chat/completions", completionUri.ToString());
+
+                    using var postReq = new HttpRequestMessage(HttpMethod.Post, completionUri);
                     protocol.ApplyHeaders(postReq, epWithSuffix, "req-1");
                     Assert.Equal("https://api.deepseek.com/chat/completions", postReq.RequestUri?.ToString());
+                    Assert.True(postReq.Headers.TryGetValues("Authorization", out var authVals));
+                    Assert.Equal("Bearer ds-k", authVals!.Single());
                     Assert.False(postReq.Headers.Contains("x-opencode-session"));
 
-                    using var probeReq = protocol.BuildHealthProbeRequest(epWithSuffix, "ignored");
+                    using var probeReq = protocol.BuildHealthProbeRequest(epWithSuffix);
                     Assert.Equal(HttpMethod.Get, probeReq.Method);
                     Assert.Equal("https://api.deepseek.com/models", probeReq.RequestUri?.ToString());
                 }),
@@ -508,16 +422,39 @@ namespace RimMind.ModelService.Tests.Contracts
                         Assert.Equal("deepseek-flash", factory.DefaultModelName);
                         Assert.True(factory.VisibleInMenu);
 
-                        var configuredClient = factory.Create(new LocalSettingsStub
+                        var configuredClient = factory.Create(new TestSettingsStub
                         {
                             ApiKey = "ds-key-ok",
-                            ApiEndpoint = "https://api.openai.com/v1",
+                            ApiEndpoint = "https://custom-gateway.corp.example/v1",
                             ModelName = "deepseek-v4-pro"
                         });
                         Assert.True(configuredClient.IsConfigured());
+                        Assert.False(configuredClient.IsLocalEndpoint);
 
-                        var unconfiguredClient = factory.Create(new LocalSettingsStub { ApiKey = "" });
+                        var localProxyClient = factory.Create(new TestSettingsStub
+                        {
+                            ApiKey = "ds-key-ok",
+                            ApiEndpoint = "http://127.0.0.1:8088/v1",
+                            ModelName = "deepseek-flash"
+                        });
+                        Assert.True(localProxyClient.IsConfigured());
+                        Assert.True(localProxyClient.IsLocalEndpoint);
+
+                        var unconfiguredClient = factory.Create(new TestSettingsStub { ApiKey = "" });
                         Assert.False(unconfiguredClient.IsConfigured());
+
+                        var poolSettings = new ModelServiceSettings
+                        {
+                            enableService = true,
+                            endpoints = new List<ModelEndpointConfig>
+                            {
+                                new ModelEndpointConfig { id = "ds-unhealthy", protocolId = "deepseek", endpoint = "https://unhealthy.example/v1", apiKey = "k1", isEnabled = true, isHealthy = false },
+                                new ModelEndpointConfig { id = "ds-healthy", protocolId = "deepseek", endpoint = "https://healthy.example/v1", apiKey = "k2", isEnabled = true, isHealthy = true }
+                            }
+                        };
+                        var resolvedBest = EndpointPoolResolver.ResolveBestEndpoint(poolSettings, null, ModelProtocolRegistry.DeepSeekProtocolId, requireApiKey: true);
+                        Assert.NotNull(resolvedBest);
+                        Assert.Equal("ds-healthy", resolvedBest!.id);
                     }
                     finally
                     {

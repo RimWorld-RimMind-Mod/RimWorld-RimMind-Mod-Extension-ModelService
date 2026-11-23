@@ -5,8 +5,9 @@ using RimMind.ModelService.Models;
 namespace RimMind.ModelService.Protocol
 {
     /// <summary>
-    /// Thread-safe registry of <see cref="IModelProtocol"/> implementations and legacy <see cref="ProviderType"/> aliases.
-    /// Concrete protocols live in dedicated classes under <c>Source/Protocol/Protocols/</c>.
+    /// Thread-safe registry of pluggable <see cref="IModelProtocol"/> implementations.
+    /// Legacy aliases and <see cref="ProviderType"/> mappings are indexed dynamically from each
+    /// registered protocol's metadata rather than hardcoded parallel dictionaries.
     /// </summary>
     public static class ModelProtocolRegistry
     {
@@ -20,37 +21,12 @@ namespace RimMind.ModelService.Protocol
         private static readonly List<IModelProtocol> OrderedProtocols = new List<IModelProtocol>();
         private static readonly Dictionary<string, IModelProtocol> ProtocolsById =
             new Dictionary<string, IModelProtocol>(StringComparer.OrdinalIgnoreCase);
-
-        private static readonly Dictionary<string, string> Aliases =
-            new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
-            {
-                [nameof(ProviderType.OpenAICompatible)] = OpenAIProtocolId,
-                [nameof(ProviderType.AnthropicClaude)] = AnthropicProtocolId,
-                [nameof(ProviderType.LocalSubscriptionGateway)] = LocalGatewayProtocolId,
-                [nameof(ProviderType.OpenCodeGo)] = OpenCodeGoProtocolId,
-                [nameof(ProviderType.DeepSeekOfficial)] = DeepSeekProtocolId,
-                ["deepseek_native"] = DeepSeekProtocolId
-            };
-
+        private static readonly Dictionary<string, string> AliasesByKey =
+            new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
         private static readonly Dictionary<ProviderType, string> ProviderTypeToProtocolId =
-            new Dictionary<ProviderType, string>
-            {
-                [ProviderType.OpenAICompatible] = OpenAIProtocolId,
-                [ProviderType.AnthropicClaude] = AnthropicProtocolId,
-                [ProviderType.LocalSubscriptionGateway] = LocalGatewayProtocolId,
-                [ProviderType.OpenCodeGo] = OpenCodeGoProtocolId,
-                [ProviderType.DeepSeekOfficial] = DeepSeekProtocolId
-            };
-
+            new Dictionary<ProviderType, string>();
         private static readonly Dictionary<string, ProviderType> BuiltInProtocolToProviderType =
-            new Dictionary<string, ProviderType>(StringComparer.OrdinalIgnoreCase)
-            {
-                [OpenAIProtocolId] = ProviderType.OpenAICompatible,
-                [AnthropicProtocolId] = ProviderType.AnthropicClaude,
-                [LocalGatewayProtocolId] = ProviderType.LocalSubscriptionGateway,
-                [OpenCodeGoProtocolId] = ProviderType.OpenCodeGo,
-                [DeepSeekProtocolId] = ProviderType.DeepSeekOfficial
-            };
+            new Dictionary<string, ProviderType>(StringComparer.OrdinalIgnoreCase);
 
         static ModelProtocolRegistry()
         {
@@ -74,12 +50,15 @@ namespace RimMind.ModelService.Protocol
             {
                 OrderedProtocols.Clear();
                 ProtocolsById.Clear();
+                AliasesByKey.Clear();
+                ProviderTypeToProtocolId.Clear();
+                BuiltInProtocolToProviderType.Clear();
 
-                RegisterCore(OpenAIModelProtocol.Instance);
-                RegisterCore(AnthropicModelProtocol.Instance);
-                RegisterCore(LocalGatewayModelProtocol.Instance);
-                RegisterCore(OpenCodeGoModelProtocol.Instance);
-                RegisterCore(DeepSeekModelProtocol.Instance);
+                RegisterCore(OpenAIModelProtocol.Instance, isBuiltIn: true);
+                RegisterCore(AnthropicModelProtocol.Instance, isBuiltIn: true);
+                RegisterCore(LocalGatewayModelProtocol.Instance, isBuiltIn: true);
+                RegisterCore(OpenCodeGoModelProtocol.Instance, isBuiltIn: true);
+                RegisterCore(DeepSeekModelProtocol.Instance, isBuiltIn: true);
             }
         }
 
@@ -91,7 +70,7 @@ namespace RimMind.ModelService.Protocol
 
             lock (SyncRoot)
             {
-                RegisterCore(protocol);
+                RegisterCore(protocol, isBuiltIn: false);
             }
         }
 
@@ -107,7 +86,39 @@ namespace RimMind.ModelService.Protocol
 
                 ProtocolsById.Remove(key);
                 OrderedProtocols.RemoveAll(p => string.Equals(p.ProtocolId, existing.ProtocolId, StringComparison.OrdinalIgnoreCase));
+
+                var aliasesToRemove = new List<string>();
+                foreach (var kvp in AliasesByKey)
+                {
+                    if (string.Equals(kvp.Value, existing.ProtocolId, StringComparison.OrdinalIgnoreCase))
+                        aliasesToRemove.Add(kvp.Key);
+                }
+                for (int i = 0; i < aliasesToRemove.Count; i++)
+                {
+                    AliasesByKey.Remove(aliasesToRemove[i]);
+                }
+
+                if (BuiltInProtocolToProviderType.TryGetValue(existing.ProtocolId, out var legacyType))
+                {
+                    BuiltInProtocolToProviderType.Remove(existing.ProtocolId);
+                    if (ProviderTypeToProtocolId.TryGetValue(legacyType, out string? mappedId) &&
+                        string.Equals(mappedId, existing.ProtocolId, StringComparison.OrdinalIgnoreCase))
+                    {
+                        ProviderTypeToProtocolId.Remove(legacyType);
+                    }
+                }
+
                 return true;
+            }
+        }
+
+        public static string NormalizeAlias(string id)
+        {
+            if (string.IsNullOrWhiteSpace(id)) return string.Empty;
+            string trimmed = id.Trim();
+            lock (SyncRoot)
+            {
+                return AliasesByKey.TryGetValue(trimmed, out string? canonical) ? canonical : trimmed;
             }
         }
 
@@ -116,9 +127,10 @@ namespace RimMind.ModelService.Protocol
             protocol = null!;
             if (string.IsNullOrWhiteSpace(protocolId)) return false;
 
-            string key = NormalizeAlias(protocolId!.Trim());
             lock (SyncRoot)
             {
+                string trimmed = protocolId!.Trim();
+                string key = AliasesByKey.TryGetValue(trimmed, out string? canonical) ? canonical : trimmed;
                 return ProtocolsById.TryGetValue(key, out protocol!);
             }
         }
@@ -146,8 +158,15 @@ namespace RimMind.ModelService.Protocol
             return OpenAIModelProtocol.Instance;
         }
 
-        public static string ToProtocolId(ProviderType providerType) =>
-            ProviderTypeToProtocolId.TryGetValue(providerType, out string? id) ? id : OpenAIProtocolId;
+        public static string ToProtocolId(ProviderType providerType)
+        {
+            lock (SyncRoot)
+            {
+                return ProviderTypeToProtocolId.TryGetValue(providerType, out string? id)
+                    ? id
+                    : OpenAIProtocolId;
+            }
+        }
 
         public static bool TryGetBuiltInProviderType(string? protocolId, out ProviderType providerType)
         {
@@ -155,14 +174,15 @@ namespace RimMind.ModelService.Protocol
             if (string.IsNullOrWhiteSpace(protocolId))
                 return false;
 
-            string normalized = NormalizeAlias(protocolId!.Trim());
-            return BuiltInProtocolToProviderType.TryGetValue(normalized, out providerType);
+            lock (SyncRoot)
+            {
+                string trimmed = protocolId!.Trim();
+                string normalized = AliasesByKey.TryGetValue(trimmed, out string? canonical) ? canonical : trimmed;
+                return BuiltInProtocolToProviderType.TryGetValue(normalized, out providerType);
+            }
         }
 
-        private static string NormalizeAlias(string id) =>
-            Aliases.TryGetValue(id, out string? canonical) ? canonical : id;
-
-        private static void RegisterCore(IModelProtocol protocol)
+        private static void RegisterCore(IModelProtocol protocol, bool isBuiltIn)
         {
             string key = protocol.ProtocolId.Trim();
             int existingIndex = OrderedProtocols.FindIndex(p =>
@@ -176,6 +196,30 @@ namespace RimMind.ModelService.Protocol
                 OrderedProtocols.Add(protocol);
             }
             ProtocolsById[key] = protocol;
+
+            if (protocol.LegacyAliases != null)
+            {
+                for (int i = 0; i < protocol.LegacyAliases.Count; i++)
+                {
+                    string alias = protocol.LegacyAliases[i];
+                    if (string.IsNullOrWhiteSpace(alias))
+                        continue;
+
+                    string trimmedAlias = alias.Trim();
+                    if (isBuiltIn
+                        || !AliasesByKey.TryGetValue(trimmedAlias, out string? existingOwner)
+                        || !BuiltInProtocolToProviderType.ContainsKey(existingOwner))
+                    {
+                        AliasesByKey[trimmedAlias] = key;
+                    }
+                }
+            }
+
+            if (isBuiltIn)
+            {
+                ProviderTypeToProtocolId[protocol.LegacyProviderType] = key;
+                BuiltInProtocolToProviderType[key] = protocol.LegacyProviderType;
+            }
         }
     }
 }

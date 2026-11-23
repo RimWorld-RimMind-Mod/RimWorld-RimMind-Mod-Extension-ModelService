@@ -1,7 +1,5 @@
 using System;
-using System.Collections.Generic;
 using RimMind.ModelService.Client;
-using RimMind.ModelService.Models;
 using RimMind.ModelService.Protocol;
 
 namespace RimMind.ModelService.Audio
@@ -13,49 +11,40 @@ namespace RimMind.ModelService.Audio
             var msSettings = RimMindModelServiceMod.Settings;
             var envOverlay = EnvironmentEndpointOverlay.FromEnvironment();
 
-            if (msSettings != null && msSettings.endpoints != null)
+            var best = EndpointPoolResolver.ResolveBestEndpoint(
+                msSettings,
+                envOverlay,
+                protocolIdFilter: ModelProtocolRegistry.DeepSeekProtocolId,
+                requireEnableService: false,
+                requireApiKey: true);
+
+            if (best != null)
             {
-                IReadOnlyList<ModelEndpointConfig> candidates = envOverlay == null
-                    ? (IReadOnlyList<ModelEndpointConfig>)msSettings.endpoints
-                    : envOverlay.Apply(msSettings.endpoints);
+                return (NormalizeRootBaseUrl(best.endpoint), best.apiKey.Trim());
+            }
 
-                ModelEndpointConfig? best = null;
-                for (int i = 0; i < candidates.Count; i++)
+            var binding = DeepSeekModelProtocol.Instance.EnvOverrideBinding;
+            if (binding != null)
+            {
+                string? envKey = FirstNonWhiteSpaceEnv(binding.ApiKeyVars);
+                if (!string.IsNullOrWhiteSpace(envKey))
                 {
-                    var ep = candidates[i];
-                    if (ep == null || !ep.isEnabled || string.IsNullOrWhiteSpace(ep.apiKey))
-                        continue;
-                    if (!string.Equals(ep.EffectiveProtocolId, ModelProtocolRegistry.DeepSeekProtocolId, StringComparison.OrdinalIgnoreCase))
-                        continue;
-
-                    if (ep.isHealthy)
-                    {
-                        best = ep;
-                        break;
-                    }
-
-                    if (best == null)
-                        best = ep;
-                }
-
-                if (best != null)
-                {
-                    return (NormalizeRootBaseUrl(best.endpoint), best.apiKey.Trim());
+                    string? envEndpoint = FirstNonWhiteSpaceEnv(binding.EndpointVars);
+                    return (NormalizeRootBaseUrl(envEndpoint), envKey!.Trim());
                 }
             }
 
-            string? envKey = Environment.GetEnvironmentVariable("RIMMIND_DEEPSEEK_API_KEY");
-            if (string.IsNullOrWhiteSpace(envKey))
-            {
-                envKey = Environment.GetEnvironmentVariable("DEEPSEEK_API_KEY");
-            }
+            return null;
+        }
 
-            if (!string.IsNullOrWhiteSpace(envKey))
+        private static string? FirstNonWhiteSpaceEnv(string[] names)
+        {
+            for (int i = 0; i < names.Length; i++)
             {
-                string? envEndpoint = Environment.GetEnvironmentVariable("RIMMIND_DEEPSEEK_ENDPOINT");
-                return (NormalizeRootBaseUrl(envEndpoint), envKey!.Trim());
+                string? val = Environment.GetEnvironmentVariable(names[i]);
+                if (!string.IsNullOrWhiteSpace(val))
+                    return val;
             }
-
             return null;
         }
 

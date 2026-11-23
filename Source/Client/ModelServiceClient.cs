@@ -31,7 +31,7 @@ namespace RimMind.ModelService.Client
         private readonly EndpointFailoverPolicy _failoverPolicy;
         private readonly Func<HttpRequestMessage, CancellationToken, Task<HttpResponseMessage>> _httpSend;
         private readonly Func<long> _clockMs;
-        private bool _disposed;
+        private volatile bool _disposed;
 
         public int OverallTimeoutSeconds { get; set; } = DefaultOverallTimeoutSeconds;
 
@@ -73,7 +73,24 @@ namespace RimMind.ModelService.Client
             error.Code == RimMindErrorCode.ClientTransientFailure ||
             error.Code == RimMindErrorCode.Timeout;
 
-        public bool IsLocalEndpoint => false;
+        public bool IsLocalEndpoint
+        {
+            get
+            {
+                var endpoints = GetEndpointsSafe();
+                bool hasEnabled = false;
+                for (int i = 0; i < endpoints.Length; i++)
+                {
+                    var ep = endpoints[i];
+                    if (ep == null || !ep.isEnabled)
+                        continue;
+                    hasEnabled = true;
+                    if (!ep.IsLoopbackAddress)
+                        return false;
+                }
+                return hasEnabled;
+            }
+        }
         public bool IsConfigured() => GetEndpointsSafe().Any(e => e.isEnabled);
         public bool SupportsStreaming => false;
         public bool SupportsNpcServerState => false;
@@ -121,7 +138,7 @@ namespace RimMind.ModelService.Client
             LlmRequestEnvelope envelope,
             CancellationToken callerToken)
         {
-            if (callerToken.IsCancellationRequested)
+            if (_disposed || callerToken.IsCancellationRequested)
             {
                 return Result<LlmResponse, RimMindError>.Err(RimMindErrors.Cancelled());
             }
@@ -280,10 +297,7 @@ namespace RimMind.ModelService.Client
             try
             {
                 string modelOverride = !string.IsNullOrEmpty(node.modelName) ? node.modelName : protocol.DefaultModel;
-                var contextual = protocol as IContextualModelProtocol;
-                var payloadResult = contextual != null
-                    ? contextual.BuildRequestJson(envelope, node, modelOverride)
-                    : protocol.BuildRequestJson(envelope, modelOverride);
+                var payloadResult = protocol.BuildRequestJson(envelope, node, modelOverride);
                 if (payloadResult.IsErr)
                 {
                     return (Result<LlmResponse, RimMindError>.Err(payloadResult.Error), false);
@@ -298,16 +312,16 @@ namespace RimMind.ModelService.Client
                 request.Content = content;
 
                 using var response = await _httpSend(request, linkedCts.Token).ConfigureAwait(false);
-                string responseBody = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
+                string responseBody = response.Content != null
+                    ? await response.Content.ReadAsStringAsync().ConfigureAwait(false)
+                    : string.Empty;
                 stopwatch.Stop();
 
                 if (!response.IsSuccessStatusCode)
                 {
                     int statusCode = (int)response.StatusCode;
                     string safeBody = SanitizeAndTruncate(responseBody, node.apiKey);
-                    RimMindError classifiedError = contextual != null
-                        ? contextual.ClassifyHttpError(statusCode, safeBody, node)
-                        : CoreHttpErrorClassifier.Classify(statusCode, safeBody, node.name);
+                    RimMindError classifiedError = protocol.ClassifyHttpError(statusCode, safeBody, node);
                     bool isRateLimited = CoreHttpErrorClassifier.IsTransientRateLimitOrQueueError(statusCode, safeBody);
                     return (Result<LlmResponse, RimMindError>.Err(classifiedError), isRateLimited);
                 }

@@ -17,14 +17,19 @@ namespace RimMind.ModelService.Protocol
 
         public static string BuildRequestJson(LlmRequestEnvelope envelope, ModelEndpointConfig node)
         {
+            return BuildRequestJson(envelope, node?.modelName);
+        }
+
+        public static string BuildRequestJson(LlmRequestEnvelope envelope, string? modelName)
+        {
             if (envelope == null) throw new ArgumentNullException(nameof(envelope));
-            string modelName = node != null && !string.IsNullOrEmpty(node.modelName)
-                ? node.modelName
+            string effectiveModel = !string.IsNullOrEmpty(modelName)
+                ? modelName!
                 : DefaultModelName;
 
             return OpenAIWireCodec.BuildRequestJson(
                 envelope,
-                modelName,
+                effectiveModel,
                 defaultMaxTokens: 0,
                 stream: false,
                 forceJsonMode: false,
