@@ -20,7 +20,8 @@ namespace RimMind.ModelService.Protocol
             supportsSafetyCheck: true,
             supportsJsonSchema: false,
             requiresReasoningContentInToolHistory: true,
-            requiresLoopback: false);
+            requiresLoopback: false,
+            supportsVision: true);
 
         private static readonly ProtocolEnvBinding EnvBinding = new ProtocolEnvBinding(
             apiKeyVars: new[] { "RIMMIND_DEEPSEEK_API_KEY", "DEEPSEEK_API_KEY" },

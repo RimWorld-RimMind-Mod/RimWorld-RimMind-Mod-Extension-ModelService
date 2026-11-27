@@ -15,6 +15,10 @@ namespace RimMind.ModelService.Protocol
 
         private static readonly string[] DefaultAliases = { nameof(ProviderType.OpenAICompatible) };
 
+        private static readonly ProtocolCapabilities ProtocolCaps = new ProtocolCapabilities(
+            supportsJsonSchema: true,
+            supportsVision: true);
+
         public virtual string ProtocolId => ModelProtocolRegistry.OpenAIProtocolId;
         public virtual ProviderType LegacyProviderType => ProviderType.OpenAICompatible;
         public virtual IReadOnlyList<string> LegacyAliases =>
@@ -23,7 +27,7 @@ namespace RimMind.ModelService.Protocol
         public virtual string FallbackLabel => "OpenAI Compatible";
         public virtual string DefaultEndpointUrl => "https://api.openai.com/v1";
         public virtual string DefaultModel => "gpt-4o-mini";
-        public virtual ProtocolCapabilities Capabilities => ProtocolCapabilities.Default;
+        public virtual ProtocolCapabilities Capabilities => ProtocolCaps;
         public virtual ProtocolPresetDescriptor? PresetDescriptor => null;
         public virtual ProtocolEnvBinding? EnvOverrideBinding => null;
 
@@ -62,7 +66,11 @@ namespace RimMind.ModelService.Protocol
             string effectiveModel = !string.IsNullOrEmpty(modelOverride)
                 ? modelOverride
                 : (!string.IsNullOrEmpty(endpoint?.modelName) ? endpoint!.modelName : DefaultModel);
-            return Result<string, RimMindError>.Ok(OpenAIProtocolAdapter.BuildRequestJson(envelope, effectiveModel));
+            return Result<string, RimMindError>.Ok(
+                OpenAIProtocolAdapter.BuildRequestJson(
+                    envelope,
+                    effectiveModel,
+                    allowVisionAttachments: Capabilities.SupportsVision));
         }
 
         public virtual Result<LlmResponse, RimMindError> ParseResponse(string responseBody, LlmRequestEnvelope? envelope = null)

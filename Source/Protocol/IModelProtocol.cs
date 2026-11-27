@@ -62,7 +62,8 @@ namespace RimMind.ModelService.Protocol
             string? statusBadgeLabelKey = null,
             string? statusBadgeFallback = null,
             string? statusBadgeTooltipKey = null,
-            string? statusBadgeTooltipFallback = null)
+            string? statusBadgeTooltipFallback = null,
+            bool supportsVision = false)
         {
             SupportsNativeThinking = supportsNativeThinking;
             SupportsSafetyCheck = supportsSafetyCheck;
@@ -73,6 +74,7 @@ namespace RimMind.ModelService.Protocol
             StatusBadgeFallback = statusBadgeFallback;
             StatusBadgeTooltipKey = statusBadgeTooltipKey;
             StatusBadgeTooltipFallback = statusBadgeTooltipFallback;
+            SupportsVision = supportsVision;
         }
 
         public bool SupportsNativeThinking { get; }
@@ -80,6 +82,7 @@ namespace RimMind.ModelService.Protocol
         public bool SupportsJsonSchema { get; }
         public bool RequiresReasoningContentInToolHistory { get; }
         public bool RequiresLoopback { get; }
+        public bool SupportsVision { get; }
         public string? StatusBadgeLabelKey { get; }
         public string? StatusBadgeFallback { get; }
         public string? StatusBadgeTooltipKey { get; }

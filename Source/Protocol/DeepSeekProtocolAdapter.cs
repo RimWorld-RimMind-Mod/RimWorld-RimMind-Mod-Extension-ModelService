@@ -64,6 +64,7 @@ namespace RimMind.ModelService.Protocol
 
             bool safetyHigh = endpoint != null && endpoint.safetyLevel == EndpointSafetyLevel.High;
             string? sanitizedUserId = SanitizeUserId(envelope.NpcId);
+            bool allowVisionAttachments = !string.Equals(normalizedModel, ProModelName, StringComparison.OrdinalIgnoreCase);
 
             return OpenAIWireCodec.BuildRequestJson(
                 envelope,
@@ -77,7 +78,8 @@ namespace RimMind.ModelService.Protocol
                     thinkingEnabled,
                     reasoningEffortWire,
                     safetyHigh,
-                    sanitizedUserId));
+                    sanitizedUserId),
+                allowVisionAttachments: allowVisionAttachments);
         }
 
         private static void ApplyDeepSeekDialect(

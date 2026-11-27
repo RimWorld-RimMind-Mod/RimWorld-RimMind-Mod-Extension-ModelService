@@ -21,7 +21,8 @@ namespace RimMind.ModelService.Protocol
             supportsSafetyCheck: false,
             supportsJsonSchema: false,
             requiresReasoningContentInToolHistory: false,
-            requiresLoopback: false);
+            requiresLoopback: false,
+            supportsVision: true);
 
         public string ProtocolId => ModelProtocolRegistry.AnthropicProtocolId;
         public ProviderType LegacyProviderType => ProviderType.AnthropicClaude;
@@ -69,7 +70,11 @@ namespace RimMind.ModelService.Protocol
             string effectiveModel = !string.IsNullOrEmpty(modelOverride)
                 ? modelOverride
                 : (!string.IsNullOrEmpty(endpoint?.modelName) ? endpoint!.modelName : DefaultModel);
-            return Result<string, RimMindError>.Ok(AnthropicProtocolAdapter.BuildRequestJson(envelope, effectiveModel));
+            return Result<string, RimMindError>.Ok(
+                AnthropicProtocolAdapter.BuildRequestJson(
+                    envelope,
+                    effectiveModel,
+                    allowVisionAttachments: Capabilities.SupportsVision));
         }
 
         public Result<LlmResponse, RimMindError> ParseResponse(string responseBody, LlmRequestEnvelope? envelope = null)

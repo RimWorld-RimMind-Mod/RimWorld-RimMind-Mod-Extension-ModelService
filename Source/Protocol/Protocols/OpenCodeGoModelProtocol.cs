@@ -20,7 +20,8 @@ namespace RimMind.ModelService.Protocol
             statusBadgeLabelKey: "RimMind.ModelService.Security.OpenCodeGoSessionRouted",
             statusBadgeFallback: "OpenCode Go Direct",
             statusBadgeTooltipKey: "RimMind.ModelService.Security.OpenCodeGoSessionRouted.Desc",
-            statusBadgeTooltipFallback: "Automatically mounts x-opencode-session header for native OpenCode Go subscription routing.");
+            statusBadgeTooltipFallback: "Automatically mounts x-opencode-session header for native OpenCode Go subscription routing.",
+            supportsVision: true);
 
         private static readonly ProtocolEnvBinding EnvBinding = new ProtocolEnvBinding(
             apiKeyVars: new[] { "RIMMIND_BACKUP_API_KEY", "RIMMIND_TEST_API_KEY" },
