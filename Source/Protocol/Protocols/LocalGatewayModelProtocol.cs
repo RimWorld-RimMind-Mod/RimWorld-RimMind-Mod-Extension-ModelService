@@ -15,7 +15,8 @@ namespace RimMind.ModelService.Protocol
             supportsSafetyCheck: false,
             supportsJsonSchema: true,
             requiresReasoningContentInToolHistory: false,
-            requiresLoopback: true);
+            requiresLoopback: true,
+            supportsVision: true);
 
         private static readonly ProtocolPresetDescriptor Preset = new ProtocolPresetDescriptor(
             buttonLabelKey: "RimMind.ModelService.Settings.AddCodexPreset",

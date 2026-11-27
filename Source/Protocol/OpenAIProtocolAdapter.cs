@@ -15,12 +15,18 @@ namespace RimMind.ModelService.Protocol
     {
         private const string DefaultModelName = "gpt-4o-mini";
 
-        public static string BuildRequestJson(LlmRequestEnvelope envelope, ModelEndpointConfig node)
+        public static string BuildRequestJson(
+            LlmRequestEnvelope envelope,
+            ModelEndpointConfig node,
+            bool allowVisionAttachments = true)
         {
-            return BuildRequestJson(envelope, node?.modelName);
+            return BuildRequestJson(envelope, node?.modelName, allowVisionAttachments);
         }
 
-        public static string BuildRequestJson(LlmRequestEnvelope envelope, string? modelName)
+        public static string BuildRequestJson(
+            LlmRequestEnvelope envelope,
+            string? modelName,
+            bool allowVisionAttachments = true)
         {
             if (envelope == null) throw new ArgumentNullException(nameof(envelope));
             string effectiveModel = !string.IsNullOrEmpty(modelName)
@@ -33,7 +39,8 @@ namespace RimMind.ModelService.Protocol
                 defaultMaxTokens: 0,
                 stream: false,
                 forceJsonMode: false,
-                omitZeroMaxTokens: true);
+                omitZeroMaxTokens: true,
+                allowVisionAttachments: allowVisionAttachments);
         }
 
         public static Result<LlmResponse, RimMindError> ParseResponse(string responseJson)

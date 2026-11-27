@@ -15,12 +15,18 @@ namespace RimMind.ModelService.Protocol
 {
     public static class AnthropicProtocolAdapter
     {
-        public static string BuildRequestJson(LlmRequestEnvelope envelope, ModelEndpointConfig node)
+        public static string BuildRequestJson(
+            LlmRequestEnvelope envelope,
+            ModelEndpointConfig node,
+            bool allowVisionAttachments = true)
         {
-            return BuildRequestJson(envelope, node?.modelName);
+            return BuildRequestJson(envelope, node?.modelName, allowVisionAttachments);
         }
 
-        public static string BuildRequestJson(LlmRequestEnvelope envelope, string? modelName)
+        public static string BuildRequestJson(
+            LlmRequestEnvelope envelope,
+            string? modelName,
+            bool allowVisionAttachments = true)
         {
             var root = new JObject
             {
@@ -52,7 +58,8 @@ namespace RimMind.ModelService.Protocol
                 JObject? lastUserMsg = null;
                 foreach (var msg in nonSystemMessages)
                 {
-                    string role = msg.Role == "assistant" ? "assistant" : "user";
+                    bool isAssistant = string.Equals(msg.Role, "assistant", StringComparison.OrdinalIgnoreCase);
+                    string role = isAssistant ? "assistant" : "user";
                     var contentArr = new JArray();
 
                     // If it is a tool result, output tool_result block ONLY (do not duplicate text)
@@ -79,6 +86,35 @@ namespace RimMind.ModelService.Protocol
                             {
                                 ["type"] = "text",
                                 ["text"] = textContent
+                            });
+                        }
+                    }
+
+                    if (allowVisionAttachments &&
+                        role == "user" &&
+                        !isAssistant &&
+                        msg.Attachments != null &&
+                        msg.Attachments.Count > 0)
+                    {
+                        for (int a = 0; a < msg.Attachments.Count; a++)
+                        {
+                            var att = msg.Attachments[a];
+                            if (att == null || string.IsNullOrWhiteSpace(att.Base64Data))
+                                continue;
+
+                            string mediaType = !string.IsNullOrWhiteSpace(att.MediaType)
+                                ? att.MediaType.Trim()
+                                : "image/png";
+
+                            contentArr.Add(new JObject
+                            {
+                                ["type"] = "image",
+                                ["source"] = new JObject
+                                {
+                                    ["type"] = "base64",
+                                    ["media_type"] = mediaType,
+                                    ["data"] = att.Base64Data.Trim()
+                                }
                             });
                         }
                     }
